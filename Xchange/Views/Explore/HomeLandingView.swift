@@ -31,11 +31,20 @@ public struct HomeLandingView: View {
     }
     
     private var greetingName: String {
-        let name = userStore.currentUser.displayName.components(separatedBy: " ").first?.trimmingCharacters(in: .whitespaces) ?? ""
-        if name.isEmpty || name == "Sashik" {
-            return "Alex"
+        let displayName = userStore.currentUser.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !displayName.isEmpty {
+            return displayName.components(separatedBy: " ").first ?? displayName
         }
-        return name
+        let username = userStore.currentUser.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !username.isEmpty {
+            return username.capitalized
+        }
+        let emailPrefix = userStore.currentUser.email.components(separatedBy: "@").first ?? ""
+        if !emailPrefix.isEmpty {
+            let formatted = emailPrefix.replacingOccurrences(of: ".", with: " ").capitalized
+            return formatted.components(separatedBy: " ").first ?? formatted
+        }
+        return "Trader"
     }
     
     public var body: some View {

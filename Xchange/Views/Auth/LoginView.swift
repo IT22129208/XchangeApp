@@ -19,6 +19,8 @@ public struct LoginView: View {
     @State private var showForgotPasswordAlert: Bool = false
     @State private var alertMessage: String = ""
     @State private var isSubmitting: Bool = false
+    @State private var showAppleSignInSheet: Bool = false
+    @State private var showGoogleSignInSheet: Bool = false
     
     // Official theme colors from design
     private let fieldBorderGreen = Color(red: 0.24, green: 0.65, blue: 0.38)
@@ -123,19 +125,27 @@ public struct LoginView: View {
                                 // Social Login Icons (Apple, Google, Facebook)
                                 HStack(spacing: 22) {
                                     // 1. Apple Login
-                                    socialButton {
+                                    socialButton(action: {
+                                        AppTheme.triggerHaptic(style: .medium)
+                                        showAppleSignInSheet = true
+                                    }) {
                                         Image(systemName: "apple.logo")
                                             .font(.system(size: 22, weight: .medium))
                                             .foregroundColor(.black)
                                     }
                                     
                                     // 2. Google Login
-                                    socialButton {
+                                    socialButton(action: {
+                                        AppTheme.triggerHaptic(style: .medium)
+                                        showGoogleSignInSheet = true
+                                    }) {
                                         GoogleIconView()
                                     }
                                     
                                     // 3. Facebook Login
-                                    socialButton {
+                                    socialButton(action: {
+                                        loginWithSocialUser(displayName: "Sashik Silva", email: "sashik@facebook.com", avatar: "person.crop.circle.fill")
+                                    }) {
                                         FacebookIconView()
                                     }
                                 }
@@ -178,6 +188,16 @@ public struct LoginView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage)
+        }
+        .sheet(isPresented: $showAppleSignInSheet) {
+            AppleSignInModalView { name, email in
+                loginWithSocialUser(displayName: name, email: email, avatar: "apple.logo")
+            }
+        }
+        .sheet(isPresented: $showGoogleSignInSheet) {
+            GoogleSignInModalView { name, email in
+                loginWithSocialUser(displayName: name, email: email, avatar: "person.crop.circle.fill")
+            }
         }
     }
     
@@ -264,10 +284,8 @@ public struct LoginView: View {
         )
     }
     
-    private func socialButton<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        Button {
-            simulateSocialLogin()
-        } label: {
+    private func socialButton<Content: View>(action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
+        Button(action: action) {
             ZStack {
                 Circle()
                     .fill(Color.white)
@@ -289,8 +307,17 @@ public struct LoginView: View {
         // Instant simulated transition
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             let activeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "sashik@xchange.app" : email
+            let emailPrefix = activeEmail.components(separatedBy: "@").first ?? ""
+            let derivedName = emailPrefix
+                .replacingOccurrences(of: ".", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+            
+            userStore.currentUser.displayName = derivedName.isEmpty ? "Trader" : derivedName
             userStore.currentUser.email = activeEmail
+            userStore.currentUser.username = emailPrefix.lowercased()
             userStore.saveCurrentUser()
+            
             isSubmitting = false
             withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                 isLoggedIn = true
@@ -298,11 +325,324 @@ public struct LoginView: View {
         }
     }
     
-    private func simulateSocialLogin() {
-        AppTheme.triggerHaptic(style: .medium)
+    private func loginWithSocialUser(displayName: String, email: String, avatar: String) {
+        let cleanName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let username = cleanEmail.components(separatedBy: "@").first ?? "trader"
+        
+        userStore.currentUser.displayName = cleanName.isEmpty ? "Trader" : cleanName
+        userStore.currentUser.email = cleanEmail.isEmpty ? "trader@xchange.app" : cleanEmail
+        userStore.currentUser.username = username.lowercased()
+        userStore.currentUser.avatar = avatar
+        userStore.saveCurrentUser()
+        
+        AppTheme.triggerNotificationHaptic(type: .success)
         withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
             isLoggedIn = true
         }
+    }
+}
+
+// MARK: - Apple Sign-In Modal Sheet
+
+private struct AppleSignInModalView: View {
+    @Environment(\.dismiss) private var dismiss
+    var onSuccess: (String, String) -> Void
+    
+    @State private var fullName: String = "Sashik Silva"
+    @State private var appleEmail: String = "sashik@icloud.com"
+    @State private var hideMyEmail: Bool = false
+    @State private var isAuthenticating: Bool = false
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                // Apple ID Header
+                VStack(spacing: 12) {
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 48, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .padding(.top, 16)
+                    
+                    Text("Sign in with Apple")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Text("Use your Apple ID to sign into Xchange with Face ID.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+                
+                // Account Credentials Box
+                VStack(spacing: 0) {
+                    HStack {
+                        Text("Name")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .frame(width: 80, alignment: .leading)
+                        
+                        TextField("Full Name", text: $fullName)
+                            .font(.system(size: 15))
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 50)
+                    
+                    Divider()
+                        .padding(.leading, 16)
+                    
+                    HStack {
+                        Text("Apple ID")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .frame(width: 80, alignment: .leading)
+                        
+                        Text(hideMyEmail ? "sashik@privaterelay.appleid.com" : appleEmail)
+                            .font(.system(size: 15))
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 50)
+                }
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                
+                // Email Privacy Toggle
+                Toggle(isOn: $hideMyEmail) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Hide My Email")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Forward messages to your iCloud address")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .tint(Color(red: 0.24, green: 0.65, blue: 0.38))
+                .padding(.horizontal, 24)
+                
+                Spacer()
+                
+                // Continue with Apple ID Button
+                Button {
+                    isAuthenticating = true
+                    AppTheme.triggerNotificationHaptic(type: .success)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        isAuthenticating = false
+                        dismiss()
+                        let emailToUse = hideMyEmail ? "sashik@privaterelay.appleid.com" : appleEmail
+                        onSuccess(fullName, emailToUse)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isAuthenticating {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "faceid")
+                                .font(.system(size: 18, weight: .bold))
+                            Text("Continue with Apple ID")
+                                .font(.system(size: 16, weight: .bold))
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color.black)
+                    .clipShape(Capsule())
+                    .shadow(color: Color.black.opacity(0.2), radius: 8, y: 3)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+            .background(Color(UIColor.systemGroupedBackground))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Google Sign-In Modal Sheet
+
+private struct GoogleSignInModalView: View {
+    @Environment(\.dismiss) private var dismiss
+    var onSuccess: (String, String) -> Void
+    
+    @State private var customName: String = ""
+    @State private var customGmail: String = ""
+    @State private var showCustomInput: Bool = false
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                // Google Branding Header
+                VStack(spacing: 8) {
+                    GoogleIconView()
+                        .padding(.top, 14)
+                    
+                    Text("Sign in with Google")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Text("Choose a Google Account to continue to Xchange")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Account Selection List
+                VStack(spacing: 10) {
+                    // Pre-configured Account 1: Sashik Silva
+                    accountRow(
+                        name: "Sashik Silva",
+                        email: "sashik.silva@gmail.com",
+                        avatarLetter: "S",
+                        avatarColor: Color(red: 0.20, green: 0.65, blue: 0.35)
+                    ) {
+                        dismiss()
+                        onSuccess("Sashik Silva", "sashik.silva@gmail.com")
+                    }
+                    
+                    // Pre-configured Account 2: Tech Trader
+                    accountRow(
+                        name: "Trader Account",
+                        email: "sashik.trader@gmail.com",
+                        avatarLetter: "T",
+                        avatarColor: Color(red: 0.25, green: 0.52, blue: 0.95)
+                    ) {
+                        dismiss()
+                        onSuccess("Tech Trader", "sashik.trader@gmail.com")
+                    }
+                    
+                    // Option 3: Use another account
+                    if !showCustomInput {
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                showCustomInput = true
+                            }
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 40, height: 40)
+                                
+                                Text("Use another Google account")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(height: 60)
+                            .background(Color(UIColor.secondarySystemGroupedBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    } else {
+                        // Custom Gmail Input Card
+                        VStack(spacing: 10) {
+                            TextField("Your Name (e.g. Sashik)", text: $customName)
+                                .font(.system(size: 14))
+                                .padding(10)
+                                .background(Color(UIColor.tertiarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            
+                            TextField("Gmail Address (e.g. user@gmail.com)", text: $customGmail)
+                                .font(.system(size: 14))
+                                .keyboardType(.emailAddress)
+                                .autocapitalization(.none)
+                                .padding(10)
+                                .background(Color(UIColor.tertiarySystemGroupedBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            
+                            Button {
+                                let name = customName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let email = customGmail.trimmingCharacters(in: .whitespacesAndNewlines)
+                                let finalName = name.isEmpty ? (email.components(separatedBy: "@").first?.capitalized ?? "Trader") : name
+                                let finalEmail = email.isEmpty ? "user@gmail.com" : email
+                                dismiss()
+                                onSuccess(finalName, finalEmail)
+                            } label: {
+                                Text("Sign In with this Account")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 42)
+                                    .background(Color(red: 0.25, green: 0.52, blue: 0.95))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(14)
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+                .padding(.horizontal, 20)
+                
+                Spacer()
+            }
+            .background(Color(UIColor.systemGroupedBackground))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+    
+    private func accountRow(name: String, email: String, avatarLetter: String, avatarColor: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(avatarColor)
+                        .frame(width: 40, height: 40)
+                    Text(avatarLetter)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(email)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 60)
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

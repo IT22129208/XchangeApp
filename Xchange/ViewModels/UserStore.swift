@@ -1,4 +1,4 @@
-﻿//
+//
 //  UserStore.swift
 //  Xchange
 //
@@ -29,6 +29,11 @@ public class UserStore: ObservableObject {
         
         if let stored: User = PersistenceService.shared.load(User.self, from: PersistenceService.FileKey.user) {
             self.currentUser = stored
+            if self.currentUser.displayName.isEmpty || self.currentUser.displayName == "Alex" || self.currentUser.displayName == "Alex Rivera" {
+                self.currentUser.displayName = "Sashik Silva"
+                self.currentUser.username = "sashik"
+                saveCurrentUser()
+            }
         } else {
             self.currentUser = initialUser
             PersistenceService.shared.save(initialUser, to: PersistenceService.FileKey.user)
@@ -94,7 +99,7 @@ public class UserStore: ObservableObject {
         User(
             id: currentUserId,
             username: "sashik_madd",
-            displayName: "Sashik M.",
+            displayName: "Sashik Silva",
             email: "sashik@sliit.ac.lk",
             bio: "SLIIT Computing student & tech trader. Swapping audio gear, mechanical keyboards, camera primes, and retro games!",
             avatar: "person.crop.circle.fill",
