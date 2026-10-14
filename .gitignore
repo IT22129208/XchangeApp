@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+*/.DS_Store
+*.swp
+*~.nib
+
+# Xcode & Build
+build/
+DerivedData/
+*.moved-aside
+*.xcuserstate
+
+# User settings
+xcuserdata/
+*.xcuserdatad
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Swift Package Manager
+.build/
+
+# Fastlane / Logs
+*.log

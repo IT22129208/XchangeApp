@@ -1,0 +1,551 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B1001 /* XchangeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1001 /* XchangeApp.swift */; };
+		B1002 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1002 /* Item.swift */; };
+		B1003 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1003 /* User.swift */; };
+		B1004 /* TradeProposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1004 /* TradeProposal.swift */; };
+		B1005 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1005 /* Message.swift */; };
+		B1006 /* UserStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1006 /* UserStore.swift */; };
+		B1007 /* ItemStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1007 /* ItemStore.swift */; };
+		B1008 /* TradeProposalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1008 /* TradeProposalStore.swift */; };
+		B1009 /* ChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1009 /* ChatStore.swift */; };
+		B1010 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1010 /* AppTheme.swift */; };
+		B1011 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1011 /* MainTabView.swift */; };
+		B1012 /* ExploreFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1012 /* ExploreFeedView.swift */; };
+		B1013 /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1013 /* ItemDetailView.swift */; };
+		B1014 /* FilterSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1014 /* FilterSheetView.swift */; };
+		B1015 /* CreateProposalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1015 /* CreateProposalView.swift */; };
+		B1016 /* ProposalDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1016 /* ProposalDetailView.swift */; };
+		B1017 /* CounterOfferModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1017 /* CounterOfferModalView.swift */; };
+		B1018 /* ProposalsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1018 /* ProposalsListView.swift */; };
+		B1019 /* MyItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1019 /* MyItemsView.swift */; };
+		B1020 /* AddItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1020 /* AddItemView.swift */; };
+		B1021 /* TradeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1021 /* TradeChatView.swift */; };
+		B1022 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1022 /* ProfileView.swift */; };
+		B1023 /* ItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1023 /* ItemCard.swift */; };
+		B1024 /* TradeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1024 /* TradeCard.swift */; };
+		B1025 /* ValueBalanceBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1025 /* ValueBalanceBadge.swift */; };
+		B1026 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1026 /* Assets.xcassets */; };
+		B1028 /* PersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1028 /* PersistenceService.swift */; };
+		B1029 /* SmartAppraisalMLService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1029 /* SmartAppraisalMLService.swift */; };
+		B1030 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1030 /* LocationService.swift */; };
+		B1031 /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1031 /* NetworkService.swift */; };
+		B1032 /* SafeZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1032 /* SafeZone.swift */; };
+		B1033 /* AppraisalResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1033 /* AppraisalResult.swift */; };
+		B1034 /* SafeZoneStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1034 /* SafeZoneStore.swift */; };
+		B1035 /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1035 /* ViewModifiers.swift */; };
+		B1036 /* InteractiveBarterScaleGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1036 /* InteractiveBarterScaleGauge.swift */; };
+		B1037 /* ConfettiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1037 /* ConfettiView.swift */; };
+		B1038 /* SafeZoneRadarBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1038 /* SafeZoneRadarBadge.swift */; };
+		B1039 /* ARTradePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1039 /* ARTradePreviewView.swift */; };
+		B1040 /* SafeZoneMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1040 /* SafeZoneMapView.swift */; };
+		B1041 /* SmartAppraisalModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1041 /* SmartAppraisalModalView.swift */; };
+		B1042 /* AboutMissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1042 /* AboutMissionView.swift */; };
+		B1043 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1043 /* SettingsView.swift */; };
+		B1044 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1044 /* LoginView.swift */; };
+		B1045 /* XchangeLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1045 /* XchangeLogoView.swift */; };
+		B1046 /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1046 /* SignUpView.swift */; };
+		B1047 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1047 /* SplashScreenView.swift */; };
+		B1048 /* HomeLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1048 /* HomeLandingView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F1001 /* XchangeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XchangeApp.swift; sourceTree = "<group>"; };
+		F1002 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
+		F1003 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		F1004 /* TradeProposal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeProposal.swift; sourceTree = "<group>"; };
+		F1005 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
+		F1006 /* UserStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserStore.swift; sourceTree = "<group>"; };
+		F1007 /* ItemStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemStore.swift; sourceTree = "<group>"; };
+		F1008 /* TradeProposalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeProposalStore.swift; sourceTree = "<group>"; };
+		F1009 /* ChatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStore.swift; sourceTree = "<group>"; };
+		F1010 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		F1011 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		F1012 /* ExploreFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreFeedView.swift; sourceTree = "<group>"; };
+		F1013 /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDetailView.swift; sourceTree = "<group>"; };
+		F1014 /* FilterSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterSheetView.swift; sourceTree = "<group>"; };
+		F1015 /* CreateProposalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateProposalView.swift; sourceTree = "<group>"; };
+		F1016 /* ProposalDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalDetailView.swift; sourceTree = "<group>"; };
+		F1017 /* CounterOfferModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CounterOfferModalView.swift; sourceTree = "<group>"; };
+		F1018 /* ProposalsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProposalsListView.swift; sourceTree = "<group>"; };
+		F1019 /* MyItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyItemsView.swift; sourceTree = "<group>"; };
+		F1020 /* AddItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddItemView.swift; sourceTree = "<group>"; };
+		F1021 /* TradeChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeChatView.swift; sourceTree = "<group>"; };
+		F1022 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		F1023 /* ItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemCard.swift; sourceTree = "<group>"; };
+		F1024 /* TradeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeCard.swift; sourceTree = "<group>"; };
+		F1025 /* ValueBalanceBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValueBalanceBadge.swift; sourceTree = "<group>"; };
+		F1026 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F1027 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F1028 /* PersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceService.swift; sourceTree = "<group>"; };
+		F1029 /* SmartAppraisalMLService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartAppraisalMLService.swift; sourceTree = "<group>"; };
+		F1030 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		F1031 /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
+		F1032 /* SafeZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeZone.swift; sourceTree = "<group>"; };
+		F1033 /* AppraisalResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppraisalResult.swift; sourceTree = "<group>"; };
+		F1034 /* SafeZoneStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeZoneStore.swift; sourceTree = "<group>"; };
+		F1035 /* ViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModifiers.swift; sourceTree = "<group>"; };
+		F1036 /* InteractiveBarterScaleGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveBarterScaleGauge.swift; sourceTree = "<group>"; };
+		F1037 /* ConfettiView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiView.swift; sourceTree = "<group>"; };
+		F1038 /* SafeZoneRadarBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeZoneRadarBadge.swift; sourceTree = "<group>"; };
+		F1039 /* ARTradePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARTradePreviewView.swift; sourceTree = "<group>"; };
+		F1040 /* SafeZoneMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeZoneMapView.swift; sourceTree = "<group>"; };
+		F1041 /* SmartAppraisalModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartAppraisalModalView.swift; sourceTree = "<group>"; };
+		F1042 /* AboutMissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutMissionView.swift; sourceTree = "<group>"; };
+		F1043 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F1044 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		F1045 /* XchangeLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XchangeLogoView.swift; sourceTree = "<group>"; };
+		F1046 /* SignUpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignUpView.swift; sourceTree = "<group>"; };
+		F1047 /* SplashScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
+		F1048 /* HomeLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLandingView.swift; sourceTree = "<group>"; };
+		P1000 /* Xchange.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Xchange.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FW1000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G1000 = {
+			isa = PBXGroup;
+			children = (
+				G1001 /* Xchange */,
+				G1002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G1001 /* Xchange */ = {
+			isa = PBXGroup;
+			children = (
+				G1003 /* App */,
+				G1004 /* Models */,
+				G1005 /* ViewModels */,
+				G1015 /* Services */,
+				G1006 /* Theme */,
+				G1007 /* Views */,
+				G1008 /* Resources */,
+			);
+			path = Xchange;
+			sourceTree = "<group>";
+		};
+		G1002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				P1000 /* Xchange.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G1003 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F1001 /* XchangeApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		G1004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F1002 /* Item.swift */,
+				F1003 /* User.swift */,
+				F1004 /* TradeProposal.swift */,
+				F1005 /* Message.swift */,
+				F1032 /* SafeZone.swift */,
+				F1033 /* AppraisalResult.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		G1005 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				F1006 /* UserStore.swift */,
+				F1007 /* ItemStore.swift */,
+				F1008 /* TradeProposalStore.swift */,
+				F1009 /* ChatStore.swift */,
+				F1034 /* SafeZoneStore.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		G1006 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				F1010 /* AppTheme.swift */,
+				F1035 /* ViewModifiers.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		G1007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F1011 /* MainTabView.swift */,
+				G1016 /* Auth */,
+				G1009 /* Explore */,
+				G1010 /* Proposals */,
+				G1011 /* Inventory */,
+				G1012 /* Chat */,
+				G1013 /* Profile */,
+				G1014 /* Components */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		G1008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F1026 /* Assets.xcassets */,
+				F1027 /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		G1009 /* Explore */ = {
+			isa = PBXGroup;
+			children = (
+				F1048 /* HomeLandingView.swift */,
+				F1012 /* ExploreFeedView.swift */,
+				F1013 /* ItemDetailView.swift */,
+				F1014 /* FilterSheetView.swift */,
+				F1040 /* SafeZoneMapView.swift */,
+				F1041 /* SmartAppraisalModalView.swift */,
+			);
+			path = Explore;
+			sourceTree = "<group>";
+		};
+		G1010 /* Proposals */ = {
+			isa = PBXGroup;
+			children = (
+				F1015 /* CreateProposalView.swift */,
+				F1016 /* ProposalDetailView.swift */,
+				F1017 /* CounterOfferModalView.swift */,
+				F1018 /* ProposalsListView.swift */,
+			);
+			path = Proposals;
+			sourceTree = "<group>";
+		};
+		G1011 /* Inventory */ = {
+			isa = PBXGroup;
+			children = (
+				F1019 /* MyItemsView.swift */,
+				F1020 /* AddItemView.swift */,
+			);
+			path = Inventory;
+			sourceTree = "<group>";
+		};
+		G1012 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				F1021 /* TradeChatView.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		G1013 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				F1022 /* ProfileView.swift */,
+				F1042 /* AboutMissionView.swift */,
+				F1043 /* SettingsView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		G1014 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				F1023 /* ItemCard.swift */,
+				F1024 /* TradeCard.swift */,
+				F1025 /* ValueBalanceBadge.swift */,
+				F1036 /* InteractiveBarterScaleGauge.swift */,
+				F1037 /* ConfettiView.swift */,
+				F1038 /* SafeZoneRadarBadge.swift */,
+				F1039 /* ARTradePreviewView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		G1015 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F1028 /* PersistenceService.swift */,
+				F1029 /* SmartAppraisalMLService.swift */,
+				F1030 /* LocationService.swift */,
+				F1031 /* NetworkService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		G1016 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				F1047 /* SplashScreenView.swift */,
+				F1044 /* LoginView.swift */,
+				F1046 /* SignUpView.swift */,
+				F1045 /* XchangeLogoView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T1000 /* Xchange */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1000 /* Build configuration list for PBXNativeTarget "Xchange" */;
+			buildPhases = (
+				S1000 /* Sources */,
+				FW1000 /* Frameworks */,
+				R1000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Xchange;
+			productName = Xchange;
+			productReference = P1000 /* Xchange.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		PR1000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					T1000 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = C1001 /* Build configuration list for PBXProject "Xchange" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = G1000;
+			productRefGroup = G1002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				T1000 /* Xchange */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		R1000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1026 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		S1000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1001 /* XchangeApp.swift in Sources */,
+				B1002 /* Item.swift in Sources */,
+				B1003 /* User.swift in Sources */,
+				B1004 /* TradeProposal.swift in Sources */,
+				B1005 /* Message.swift in Sources */,
+				B1006 /* UserStore.swift in Sources */,
+				B1007 /* ItemStore.swift in Sources */,
+				B1008 /* TradeProposalStore.swift in Sources */,
+				B1009 /* ChatStore.swift in Sources */,
+				B1010 /* AppTheme.swift in Sources */,
+				B1011 /* MainTabView.swift in Sources */,
+				B1012 /* ExploreFeedView.swift in Sources */,
+				B1013 /* ItemDetailView.swift in Sources */,
+				B1014 /* FilterSheetView.swift in Sources */,
+				B1015 /* CreateProposalView.swift in Sources */,
+				B1016 /* ProposalDetailView.swift in Sources */,
+				B1017 /* CounterOfferModalView.swift in Sources */,
+				B1018 /* ProposalsListView.swift in Sources */,
+				B1019 /* MyItemsView.swift in Sources */,
+				B1020 /* AddItemView.swift in Sources */,
+				B1021 /* TradeChatView.swift in Sources */,
+				B1022 /* ProfileView.swift in Sources */,
+				B1023 /* ItemCard.swift in Sources */,
+				B1024 /* TradeCard.swift in Sources */,
+				B1025 /* ValueBalanceBadge.swift in Sources */,
+				B1028 /* PersistenceService.swift in Sources */,
+				B1029 /* SmartAppraisalMLService.swift in Sources */,
+				B1030 /* LocationService.swift in Sources */,
+				B1031 /* NetworkService.swift in Sources */,
+				B1032 /* SafeZone.swift in Sources */,
+				B1033 /* AppraisalResult.swift in Sources */,
+				B1034 /* SafeZoneStore.swift in Sources */,
+				B1035 /* ViewModifiers.swift in Sources */,
+				B1036 /* InteractiveBarterScaleGauge.swift in Sources */,
+				B1037 /* ConfettiView.swift in Sources */,
+				B1038 /* SafeZoneRadarBadge.swift in Sources */,
+				B1039 /* ARTradePreviewView.swift in Sources */,
+				B1040 /* SafeZoneMapView.swift in Sources */,
+				B1041 /* SmartAppraisalModalView.swift in Sources */,
+				B1042 /* AboutMissionView.swift in Sources */,
+				B1043 /* SettingsView.swift in Sources */,
+				B1044 /* LoginView.swift in Sources */,
+				B1045 /* XchangeLogoView.swift in Sources */,
+				B1046 /* SignUpView.swift in Sources */,
+				B1047 /* SplashScreenView.swift in Sources */,
+				B1048 /* HomeLandingView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		BC1000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6PMASQKA49;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Xchange/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xchange.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BC1001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6PMASQKA49;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Xchange/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xchange.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BC1002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDEFINED_VARIABLES = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		BC1003 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDEFINED_VARIABLES = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C1000 /* Build configuration list for PBXNativeTarget "Xchange" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC1000 /* Debug */,
+				BC1001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C1001 /* Build configuration list for PBXProject "Xchange" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC1002 /* Debug */,
+				BC1003 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = PR1000 /* Project object */;
+}
