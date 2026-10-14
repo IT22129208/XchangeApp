@@ -27,18 +27,20 @@ public class UserStore: ObservableObject {
         let initialUser = Self.createInitialCurrentUser()
         let initialUsers = Self.createCommunityUsers()
         
-        if let stored: User = PersistenceService.shared.load(User.self, from: PersistenceService.FileKey.user) {
-            self.currentUser = stored
-            if self.currentUser.displayName.isEmpty || self.currentUser.displayName == "Alex" || self.currentUser.displayName == "Alex Rivera" {
-                self.currentUser.displayName = "Sashik Silva"
-                self.currentUser.username = "sashik"
-                saveCurrentUser()
+        var loadedUser: User
+        if var stored: User = PersistenceService.shared.load(User.self, from: PersistenceService.FileKey.user) {
+            if stored.displayName.isEmpty || stored.displayName == "Alex" || stored.displayName == "Alex Rivera" {
+                stored.displayName = "Sashik Silva"
+                stored.username = "sashik"
+                PersistenceService.shared.save(stored, to: PersistenceService.FileKey.user)
             }
+            loadedUser = stored
         } else {
-            self.currentUser = initialUser
+            loadedUser = initialUser
             PersistenceService.shared.save(initialUser, to: PersistenceService.FileKey.user)
         }
         
+        self.currentUser = loadedUser
         self.allUsers = initialUsers
     }
     
