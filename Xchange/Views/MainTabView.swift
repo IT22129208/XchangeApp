@@ -47,7 +47,9 @@ public struct MainTabView: View {
                 case .messages:
                     ProposalsListView()
                 case .profile:
-                    ProfileView()
+                    ProfileView(onNavigateBack: {
+                        selectedTab = .home
+                    })
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
