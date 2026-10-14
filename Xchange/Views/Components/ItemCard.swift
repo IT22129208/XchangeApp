@@ -104,7 +104,11 @@ public struct ItemCard: View {
     @ViewBuilder
     private var itemVisual: some View {
         if let firstImage = item.images.first, !firstImage.isEmpty {
-            if UIImage(named: firstImage) != nil {
+            if let customImg = PersistenceService.shared.resolveImage(nameOrPath: firstImage) {
+                Image(uiImage: customImg)
+                    .resizable()
+                    .scaledToFill()
+            } else if UIImage(named: firstImage) != nil {
                 Image(firstImage)
                     .resizable()
                     .scaledToFill()
@@ -119,6 +123,7 @@ public struct ItemCard: View {
         } else {
             symbolPlaceholder(systemName: item.category.systemIcon)
         }
+
     }
     
     private func symbolPlaceholder(systemName: String) -> some View {

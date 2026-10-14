@@ -19,6 +19,7 @@ public struct MainTabView: View {
     public enum Tab: String, CaseIterable {
         case home = "Home"
         case browse = "Browse"
+        case addListing = "Add Listing"
         case messages = "Messages"
         case profile = "Profile"
     }
@@ -39,11 +40,18 @@ public struct MainTabView: View {
                             selectedTab = .browse
                         },
                         onAddListing: {
-                            showAddItemSheet = true
+                            selectedTab = .addListing
                         }
                     )
                 case .browse:
                     ExploreFeedView()
+                case .addListing:
+                    AddItemView(
+                        isPresentedAsModal: false,
+                        onPublishSuccess: {
+                            selectedTab = .browse
+                        }
+                    )
                 case .messages:
                     ProposalsListView()
                 case .profile:
@@ -59,7 +67,7 @@ public struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showAddItemSheet) {
-            AddItemView()
+            AddItemView(isPresentedAsModal: true)
         }
     }
     
@@ -76,14 +84,14 @@ public struct MainTabView: View {
             // 3. Center Elevated "Add Listing" Button
             Button {
                 AppTheme.triggerHaptic(style: .medium)
-                showAddItemSheet = true
+                selectedTab = .addListing
             } label: {
                 VStack(spacing: 3) {
                     ZStack {
                         Circle()
                             .fill(activeGreen)
                             .frame(width: 52, height: 52)
-                            .shadow(color: activeGreen.opacity(0.4), radius: 8, y: 3)
+                            .shadow(color: activeGreen.opacity(selectedTab == .addListing ? 0.7 : 0.4), radius: selectedTab == .addListing ? 10 : 8, y: 3)
                         
                         Image(systemName: "plus")
                             .font(.system(size: 24, weight: .bold))
@@ -92,13 +100,14 @@ public struct MainTabView: View {
                     .offset(y: -10)
                     
                     Text("Add Listing")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(inactiveGray)
+                        .font(.system(size: 11, weight: selectedTab == .addListing ? .bold : .medium))
+                        .foregroundColor(selectedTab == .addListing ? activeGreen : inactiveGray)
                         .offset(y: -6)
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(PlainButtonStyle())
+
             
             // 4. Messages / Trades Tab
             tabBarItem(tab: .messages, icon: "bubble.left.fill", label: "Messages")

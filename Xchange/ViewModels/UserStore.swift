@@ -49,12 +49,32 @@ public class UserStore: ObservableObject {
     }
     
     public func updateProfile(displayName: String, bio: String, location: String) {
+        updateProfile(displayName: displayName, bio: bio, location: location, email: nil, username: nil)
+    }
+    
+    public func updateProfile(displayName: String, bio: String, location: String, email: String? = nil, username: String? = nil) {
         currentUser.displayName = displayName
         currentUser.bio = bio
         currentUser.location = location
+        if let email = email, !email.isEmpty {
+            currentUser.email = email
+        }
+        if let username = username, !username.isEmpty {
+            currentUser.username = username
+        }
         saveCurrentUser()
         AppTheme.triggerNotificationHaptic(type: .success)
     }
+    
+    public func updateProfilePhoto(_ image: UIImage) {
+        let filename = "user_avatar_\(currentUser.id.uuidString).jpg"
+        if persistence.saveImage(image, filename: filename) {
+            currentUser.avatar = filename
+            saveCurrentUser()
+            AppTheme.triggerNotificationHaptic(type: .success)
+        }
+    }
+
     
     public func addWishlistItem(_ item: String) {
         let trimmed = item.trimmingCharacters(in: .whitespacesAndNewlines)

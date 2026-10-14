@@ -1,4 +1,4 @@
-﻿//
+//
 //  PersistenceService.swift
 //  Xchange
 //
@@ -8,6 +8,8 @@
 
 import Foundation
 import Combine
+import UIKit
+
 
 /// Dedicated persistence service managing local file storage and caching
 /// Guarantees offline data persistence for items, proposals, messages, and user state.
@@ -132,4 +134,41 @@ public final class PersistenceService {
         }
         return total
     }
+    
+    // MARK: - Image Persistence Operations
+    
+    /// Saves a UIImage as JPEG data to the documents directory and returns whether it succeeded
+    @discardableResult
+    public func saveImage(_ image: UIImage, filename: String) -> Bool {
+        guard let data = image.jpegData(compressionQuality: 0.85) else { return false }
+        let destination = fileURL(for: filename)
+        do {
+            try data.write(to: destination, options: [.atomicWrite, .completeFileProtection])
+            return true
+        } catch {
+            return false
+        }
+    }
+    
+    /// Loads a UIImage from the documents directory by filename
+    public func loadImage(filename: String) -> UIImage? {
+        let destination = fileURL(for: filename)
+        guard fileManager.fileExists(atPath: destination.path) else { return nil }
+        return UIImage(contentsOfFile: destination.path)
+    }
+    
+    /// Helper to resolve any image string: documents directory, asset catalog, or disk path
+    public func resolveImage(nameOrPath: String) -> UIImage? {
+        if let docImg = loadImage(filename: nameOrPath) {
+            return docImg
+        }
+        if fileManager.fileExists(atPath: nameOrPath), let fileImg = UIImage(contentsOfFile: nameOrPath) {
+            return fileImg
+        }
+        if let assetImg = UIImage(named: nameOrPath) {
+            return assetImg
+        }
+        return nil
+    }
 }
+

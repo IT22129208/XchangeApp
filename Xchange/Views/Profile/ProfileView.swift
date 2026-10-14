@@ -7,6 +7,9 @@
 //
 
 import SwiftUI
+import PhotosUI
+import UIKit
+
 
 public struct ProfileView: View {
     @EnvironmentObject var userStore: UserStore
@@ -155,32 +158,64 @@ public struct ProfileView: View {
     
     private var mainProfileCard: some View {
         VStack(spacing: 12) {
-            // Circular Avatar
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 92, height: 92)
-                
-                if UIImage(named: "user_avatar_profile") != nil {
-                    Image("user_avatar_profile")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 88, height: 88)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: user.avatar)
-                        .font(.system(size: 52))
-                        .foregroundColor(accentGreen)
-                        .frame(width: 88, height: 88)
-                        .background(accentGreen.opacity(0.15))
-                        .clipShape(Circle())
+            // Circular Avatar (Tappable to Edit Profile / Upload Photo)
+            Button {
+                AppTheme.triggerHaptic(style: .medium)
+                showEditProfileSheet = true
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 92, height: 92)
+                        
+                        if let customImg = PersistenceService.shared.resolveImage(nameOrPath: user.avatar) {
+                            Image(uiImage: customImg)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 88, height: 88)
+                                .clipShape(Circle())
+                        } else if UIImage(named: user.avatar) != nil {
+                            Image(user.avatar)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 88, height: 88)
+                                .clipShape(Circle())
+                        } else if UIImage(named: "user_avatar_profile") != nil {
+                            Image("user_avatar_profile")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 88, height: 88)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: user.avatar)
+                                .font(.system(size: 52))
+                                .foregroundColor(accentGreen)
+                                .frame(width: 88, height: 88)
+                                .background(accentGreen.opacity(0.15))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(accentGreen.opacity(0.4), lineWidth: 1.5)
+                    )
+                    
+                    // Subtle Camera Icon Badge
+                    Circle()
+                        .fill(accentGreen)
+                        .frame(width: 26, height: 26)
+                        .overlay(
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .offset(x: 2, y: 2)
                 }
+                .shadow(color: Color.black.opacity(0.3), radius: 6, y: 3)
             }
-            .overlay(
-                Circle()
-                    .stroke(accentGreen.opacity(0.35), lineWidth: 1.5)
-            )
-            .shadow(color: Color.black.opacity(0.25), radius: 6, y: 3)
+            .buttonStyle(PlainButtonStyle())
+
             
             // Name
             Text(user.displayName)
@@ -444,50 +479,286 @@ private struct EditProfileModalView: View {
     let userStore: UserStore
     
     @State private var displayName: String = ""
+    @State private var username: String = ""
+    @State private var email: String = ""
     @State private var location: String = ""
     @State private var bio: String = ""
     
+    // Photo Picker State
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var selectedImage: UIImage? = nil
+    @State private var isSaving: Bool = false
+    
+    private let accentGreen = Color(red: 0.24, green: 0.65, blue: 0.38)
+    private let fieldBg = Color(red: 0.08, green: 0.10, blue: 0.12)
+    private let fieldBorder = Color.white.opacity(0.12)
+    
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: Text("Profile Information")) {
-                    TextField("Full Name", text: $displayName)
-                    TextField("Location", text: $location)
-                }
+            ZStack {
+                Color.black.ignoresSafeArea()
                 
-                Section(header: Text("Bio & Trading Interests")) {
-                    TextEditor(text: $bio)
-                        .frame(height: 80)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 22) {
+                        // 1. Photo Upload / Avatar Header
+                        photoUploadSection
+                            .padding(.top, 16)
+                        
+                        // 2. Personal Information Fields
+                        VStack(alignment: .leading, spacing: 16) {
+                            inputField(
+                                label: "Display Name",
+                                placeholder: "e.g., Alex Rivera",
+                                text: $displayName,
+                                icon: "person.fill"
+                            )
+                            
+                            inputField(
+                                label: "Username",
+                                placeholder: "e.g., alex_rivera",
+                                text: $username,
+                                icon: "at"
+                            )
+                            
+                            inputField(
+                                label: "Email Address",
+                                placeholder: "e.g., alex@example.com",
+                                text: $email,
+                                icon: "envelope.fill",
+                                keyboardType: .emailAddress
+                            )
+                            
+                            inputField(
+                                label: "Location",
+                                placeholder: "e.g., San Francisco, CA",
+                                text: $location,
+                                icon: "mappin.circle.fill"
+                            )
+                            
+                            // Bio & Interests Multi-line
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Bio & Trading Interests")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.85))
+                                
+                                TextEditor(text: $bio)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(height: 90)
+                                    .padding(12)
+                                    .background(fieldBg)
+                                    .foregroundColor(.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(fieldBorder, lineWidth: 1)
+                                    )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // 3. Save Button
+                        Button {
+                            saveProfile()
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isSaving {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 16, weight: .bold))
+                                    Text("Save Changes")
+                                        .font(.system(size: 16, weight: .bold))
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(accentGreen)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .shadow(color: accentGreen.opacity(0.35), radius: 8, y: 3)
+                        }
+                        .disabled(isSaving || displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        .padding(.bottom, 30)
+                    }
                 }
             }
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                displayName = user.displayName
-                location = user.location
-                bio = user.bio
-            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundColor(.gray)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        userStore.updateProfile(
-                            displayName: displayName,
-                            bio: bio,
-                            location: location
-                        )
-                        AppTheme.triggerNotificationHaptic(type: .success)
-                        dismiss()
+                    Button("Save") { saveProfile() }
+                        .fontWeight(.bold)
+                        .foregroundColor(accentGreen)
+                        .disabled(displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                displayName = user.displayName
+                username = user.username
+                email = user.email
+                location = user.location
+                bio = user.bio
+            }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                Task {
+                    if let newItem = newItem,
+                       let data = try? await newItem.loadTransferable(type: Data.self),
+                       let uiImage = UIImage(data: data) {
+                        await MainActor.run {
+                            self.selectedImage = uiImage
+                            AppTheme.triggerNotificationHaptic(type: .success)
+                        }
                     }
-                    .fontWeight(.bold)
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+    }
+    
+    // MARK: - Photo Upload Section
+    
+    private var photoUploadSection: some View {
+        VStack(spacing: 12) {
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                ZStack(alignment: .bottomTrailing) {
+                    // Avatar Image Display
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 104, height: 104)
+                        
+                        if let selectedImage = selectedImage {
+                            Image(uiImage: selectedImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                        } else if let customImg = PersistenceService.shared.resolveImage(nameOrPath: user.avatar) {
+                            Image(uiImage: customImg)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                        } else if UIImage(named: user.avatar) != nil {
+                            Image(user.avatar)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                        } else if UIImage(named: "user_avatar_profile") != nil {
+                            Image("user_avatar_profile")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: user.avatar)
+                                .font(.system(size: 56))
+                                .foregroundColor(accentGreen)
+                                .frame(width: 100, height: 100)
+                                .background(accentGreen.opacity(0.15))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(accentGreen, lineWidth: 2)
+                    )
+                    
+                    // Camera Badge
+                    Circle()
+                        .fill(accentGreen)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .offset(x: 2, y: 2)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // "Change Photo" Button Label
+            PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                HStack(spacing: 6) {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(selectedImage != nil ? "Photo Selected (Tap to Change)" : "Upload Profile Picture")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(accentGreen)
+            }
+        }
+    }
+    
+    // MARK: - Input Field Helper
+    
+    private func inputField(
+        label: String,
+        placeholder: String,
+        text: Binding<String>,
+        icon: String,
+        keyboardType: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+            
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundColor(accentGreen)
+                    .frame(width: 20)
+                
+                TextField("", text: text, prompt: Text(placeholder).foregroundColor(Color.gray.opacity(0.6)))
+                    .font(.system(size: 15))
+                    .foregroundColor(.white)
+                    .keyboardType(keyboardType)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 50)
+            .background(fieldBg)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(fieldBorder, lineWidth: 1)
+            )
+        }
+    }
+    
+    // MARK: - Save Action
+    
+    private func saveProfile() {
+        isSaving = true
+        AppTheme.triggerHaptic(style: .medium)
+        
+        if let image = selectedImage {
+            userStore.updateProfilePhoto(image)
+        }
+        
+        userStore.updateProfile(
+            displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+            bio: bio.trimmingCharacters(in: .whitespacesAndNewlines),
+            location: location.trimmingCharacters(in: .whitespacesAndNewlines),
+            email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+            username: username.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        
+        AppTheme.triggerNotificationHaptic(type: .success)
+        dismiss()
     }
 }
+
 
 // MARK: - Language Selection Sheet
 

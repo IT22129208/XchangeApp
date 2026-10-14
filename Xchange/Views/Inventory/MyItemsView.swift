@@ -1,4 +1,4 @@
-﻿//
+//
 //  MyItemsView.swift
 //  Xchange
 //
@@ -72,8 +72,9 @@ public struct MyItemsView: View {
                 }
             }
             .sheet(isPresented: $showAddItemSheet) {
-                AddItemView()
+                AddItemView(isPresentedAsModal: true)
             }
+
             .sheet(item: $selectedItemForDetail) { item in
                 ItemDetailView(item: item)
             }

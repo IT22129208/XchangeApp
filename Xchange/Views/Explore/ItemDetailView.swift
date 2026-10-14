@@ -118,7 +118,13 @@ public struct ItemDetailView: View {
     private var itemVisualHero: some View {
         ZStack(alignment: .bottomLeading) {
             if let firstImage = item.images.first, !firstImage.isEmpty {
-                if UIImage(named: firstImage) != nil {
+                if let customImg = PersistenceService.shared.resolveImage(nameOrPath: firstImage) {
+                    Image(uiImage: customImg)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 280)
+                        .clipped()
+                } else if UIImage(named: firstImage) != nil {
                     Image(firstImage)
                         .resizable()
                         .scaledToFill()
