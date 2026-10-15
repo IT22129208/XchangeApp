@@ -273,17 +273,15 @@ public final class FirebaseDatabaseService: ObservableObject {
             }
             
             let decoder = JSONDecoder()
-            let isoFormatter = ISO8601DateFormatter()
-            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let basicFormatter = ISO8601DateFormatter()
-            
             decoder.dateDecodingStrategy = .custom { d in
                 let container = try d.singleValueContainer()
                 let str = try container.decode(String.self)
-                if let date = isoFormatter.date(from: str) {
+                let formatter = ISO8601DateFormatter()
+                if let date = formatter.date(from: str) {
                     return date
                 }
-                if let date = basicFormatter.date(from: str) {
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                if let date = formatter.date(from: str) {
                     return date
                 }
                 if let sec = Double(str) {
