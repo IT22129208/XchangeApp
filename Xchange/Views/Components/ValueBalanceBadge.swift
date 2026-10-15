@@ -1,4 +1,4 @@
-﻿//
+//
 //  ValueBalanceBadge.swift
 //  Xchange
 //
@@ -103,7 +103,7 @@ public struct ValueBalanceBadge: View {
                         Text("You Give")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
-                        Text("$\(Int(offeredValue))")
+                        Text("LKR \(Int(offeredValue))")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(AppTheme.primary)
                     }
@@ -120,7 +120,7 @@ public struct ValueBalanceBadge: View {
                         Text("You Receive")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
-                        Text("$\(Int(requestedValue))")
+                        Text("LKR \(Int(requestedValue))")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(AppTheme.tradeAccent)
                     }
@@ -150,9 +150,9 @@ public struct ValueBalanceBadge: View {
         if isFair {
             return "Fair & Balanced Trade"
         } else if difference > 0 {
-            return "+$\(Int(abs(difference))) in Partner's Favor"
+            return "+LKR \(Int(abs(difference))) in Partner's Favor"
         } else {
-            return "+$\(Int(abs(difference))) in Your Favor"
+            return "+LKR \(Int(abs(difference))) in Your Favor"
         }
     }
 }

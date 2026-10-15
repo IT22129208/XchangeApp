@@ -1,4 +1,4 @@
-﻿//
+//
 //  ProposalsListView.swift
 //  Xchange
 //
@@ -42,6 +42,7 @@ public struct ProposalsListView: View {
                                 NavigationLink(destination: ProposalDetailView(proposalId: proposal.id)) {
                                     TradeCard(
                                         proposal: proposal,
+                                        currentUser: userStore.currentUser,
                                         currentUserId: userStore.currentUser.id,
                                         onAccept: {
                                             tradeStore.acceptProposal(proposalId: proposal.id)
@@ -60,11 +61,19 @@ public struct ProposalsListView: View {
                     }
                     .padding(16)
                 }
+                .refreshable {
+                    await tradeStore.fetchRemoteProposals()
+                }
             }
             .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Barter Trades")
             .sheet(item: $selectedProposalForCounter) { proposal in
                 CounterOfferModalView(proposal: proposal)
+            }
+            .onAppear {
+                Task {
+                    await tradeStore.fetchRemoteProposals()
+                }
             }
         }
     }
@@ -72,16 +81,16 @@ public struct ProposalsListView: View {
     // MARK: - Helpers & Subviews
     
     private var proposalsForCurrentTab: [TradeProposal] {
-        let userId = userStore.currentUser.id
+        let user = userStore.currentUser
         switch selectedTab {
         case .incoming:
-            return tradeStore.incomingProposals(for: userId)
+            return tradeStore.incomingProposals(for: user)
         case .outgoing:
-            return tradeStore.outgoingProposals(for: userId)
+            return tradeStore.outgoingProposals(for: user)
         case .active:
-            return tradeStore.activeDeals(for: userId)
+            return tradeStore.activeDeals(for: user)
         case .history:
-            return tradeStore.pastTrades(for: userId)
+            return tradeStore.pastTrades(for: user)
         }
     }
     
@@ -98,7 +107,7 @@ public struct ProposalsListView: View {
                             .font(.system(size: 13, weight: isSelected ? .bold : .medium, design: .rounded))
                         
                         if tab == .incoming {
-                            let count = tradeStore.pendingCount(for: userStore.currentUser.id)
+                            let count = tradeStore.pendingCount(for: userStore.currentUser)
                             if count > 0 {
                                 Text("\(count)")
                                     .font(.system(size: 10, weight: .heavy))

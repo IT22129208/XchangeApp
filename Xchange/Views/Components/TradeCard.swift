@@ -1,4 +1,4 @@
-﻿//
+//
 //  TradeCard.swift
 //  Xchange
 //
@@ -9,13 +9,17 @@ import SwiftUI
 
 public struct TradeCard: View {
     let proposal: TradeProposal
+    var currentUser: User? = nil
     let currentUserId: UUID
     var onAccept: (() -> Void)? = nil
     var onDecline: (() -> Void)? = nil
     var onCounter: (() -> Void)? = nil
     
     private var isIncoming: Bool {
-        proposal.receiverId == currentUserId
+        if let user = currentUser {
+            return proposal.isIncoming(for: user)
+        }
+        return proposal.receiverId == currentUserId
     }
     
     private var partnerName: String {
@@ -100,7 +104,7 @@ public struct TradeCard: View {
                         }
                     }
                     
-                    Text("$\(Int(proposal.totalOfferedValue))")
+                    Text("LKR \(Int(proposal.totalOfferedValue))")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(AppTheme.primary)
                 }
@@ -138,7 +142,7 @@ public struct TradeCard: View {
                         }
                     }
                     
-                    Text("$\(Int(proposal.totalRequestedValue))")
+                    Text("LKR \(Int(proposal.totalRequestedValue))")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(AppTheme.tradeAccent)
                 }

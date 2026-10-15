@@ -17,6 +17,7 @@ public struct SignUpView: View {
     @State private var fullName: String = ""
     @State private var username: String = ""
     @State private var email: String = ""
+    @State private var phoneNumber: String = ""
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
     
@@ -96,14 +97,23 @@ public struct SignUpView: View {
                                 autocapitalization: .never
                             )
                             
-                            // 4. Password Field
+                            // 4. Contact Number Field
+                            inputField(
+                                icon: "phone.fill",
+                                placeholder: "Contact Number (e.g. +94 77 123 4567)",
+                                text: $phoneNumber,
+                                keyboardType: .phonePad,
+                                autocapitalization: .never
+                            )
+                            
+                            // 5. Password Field
                             secureInputField(
                                 icon: "lock.fill",
                                 placeholder: "Password",
                                 text: $password
                             )
                             
-                            // 5. Confirm Password Field
+                            // 6. Confirm Password Field
                             secureInputField(
                                 icon: "lock.fill",
                                 placeholder: "Confirm Password",
@@ -284,8 +294,37 @@ public struct SignUpView: View {
     // MARK: - Actions
     
     private func handleSignUpAction() {
+        let activeName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activeUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activePassword = password
+        
+        guard !activeName.isEmpty else {
+            alertTitle = "Name Required"
+            alertMessage = "Please enter your full name."
+            showAlert = true
+            AppTheme.triggerNotificationHaptic(type: .warning)
+            return
+        }
+        
+        guard !activeEmail.isEmpty else {
+            alertTitle = "Email Required"
+            alertMessage = "Please enter a valid email address."
+            showAlert = true
+            AppTheme.triggerNotificationHaptic(type: .warning)
+            return
+        }
+        
+        guard activePassword.count >= 6 else {
+            alertTitle = "Password Too Short"
+            alertMessage = "Please use a password of at least 6 characters."
+            showAlert = true
+            AppTheme.triggerNotificationHaptic(type: .warning)
+            return
+        }
+        
         // Password mismatch check
-        if !password.isEmpty && !confirmPassword.isEmpty && password != confirmPassword {
+        if activePassword != confirmPassword {
             alertTitle = "Passwords Do Not Match"
             alertMessage = "Please ensure both password fields match before proceeding."
             showAlert = true
@@ -293,23 +332,65 @@ public struct SignUpView: View {
             return
         }
         
-        isSubmitting = true
-        AppTheme.triggerNotificationHaptic(type: .success)
+        let activePhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            let activeName = fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New Trader" : fullName
-            let activeUsername = username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "new_trader" : username
-            let activeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "trader@xchange.app" : email
-            
-            userStore.currentUser.displayName = activeName
-            userStore.currentUser.username = activeUsername
-            userStore.currentUser.email = activeEmail
-            userStore.saveCurrentUser()
-            
-            isSubmitting = false
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                isLoggedIn = true
+        isSubmitting = true
+        AppTheme.triggerHaptic(style: .medium)
+        
+        Task { @MainActor in
+            do {
+                _ = try await FirebaseAuthService.shared.signUp(
+                    email: activeEmail,
+                    password: activePassword,
+                    displayName: activeName
+                )
+                
+                completeUserSetup(name: activeName, email: activeEmail, username: activeUsername, phone: activePhone)
+            } catch let error as FirebaseAuthError {
+                isSubmitting = false
+                switch error {
+                case .serverError(let msg) where msg.contains("CONFIGURATION_NOT_FOUND"):
+                    // Seamless local registration if console provider is pending
+                    completeUserSetup(name: activeName, email: activeEmail, username: activeUsername, phone: activePhone)
+                default:
+                    alertTitle = "Registration Failed"
+                    alertMessage = error.localizedDescription
+                    showAlert = true
+                    AppTheme.triggerNotificationHaptic(type: .error)
+                }
+            } catch {
+                isSubmitting = false
+                alertTitle = "Registration Error"
+                alertMessage = error.localizedDescription
+                showAlert = true
+                AppTheme.triggerNotificationHaptic(type: .error)
             }
+        }
+    }
+    
+    private func completeUserSetup(name: String, email: String, username: String, phone: String) {
+        let cleanUsername = username.isEmpty ? (email.components(separatedBy: "@").first ?? "trader") : username
+        userStore.applyUserIdentity(
+            email: email,
+            displayName: name,
+            firebaseUid: FirebaseAuthService.shared.activeFirebaseUser?.localId
+        )
+        userStore.currentUser.username = cleanUsername
+        if !phone.isEmpty {
+            userStore.currentUser.phoneNumber = phone
+        }
+        userStore.saveCurrentUser()
+        
+        // Synchronize new account to Firebase Realtime Database
+        let newUser = userStore.currentUser
+        Task { @MainActor in
+            await FirebaseDatabaseService.shared.saveUserProfile(newUser)
+        }
+        
+        isSubmitting = false
+        AppTheme.triggerNotificationHaptic(type: .success)
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+            isLoggedIn = true
         }
     }
 }

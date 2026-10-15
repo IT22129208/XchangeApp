@@ -18,12 +18,11 @@ public struct ItemDetailView: View {
     let item: Item
     
     @State private var showCreateProposalSheet = false
-    @State private var showARPreview = false
     @State private var showAppraisalModal = false
     @State private var showSafeZoneMap = false
     
     private var isOwnItem: Bool {
-        item.ownerId == userStore.currentUser.id
+        item.isOwnedBy(user: userStore.currentUser)
     }
     
     public var body: some View {
@@ -101,11 +100,14 @@ public struct ItemDetailView: View {
             .sheet(isPresented: $showCreateProposalSheet) {
                 CreateProposalView(targetItem: item)
             }
-            .sheet(isPresented: $showARPreview) {
-                ARTradePreviewView(itemTitle: item.title, category: item.category)
-            }
             .sheet(isPresented: $showAppraisalModal) {
-                SmartAppraisalModalView(initialTitle: item.title)
+                SmartAppraisalModalView(
+                    initialTitle: item.title,
+                    initialCategory: item.category,
+                    initialCondition: item.condition,
+                    initialImage: PersistenceService.shared.resolveImage(nameOrPath: item.images.first ?? ""),
+                    initialEstimatedValue: item.estimatedValue
+                )
             }
             .sheet(isPresented: $showSafeZoneMap) {
                 SafeZoneMapView()
@@ -273,45 +275,31 @@ public struct ItemDetailView: View {
     }
     
     private var emergingTechActionRow: some View {
-        HStack(spacing: 10) {
-            // AR Preview Button
-            Button {
-                showARPreview = true
-                AppTheme.triggerHaptic(style: .medium)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "cube.transparent.fill")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("AR 3D Inspect")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                }
-                .foregroundColor(AppTheme.primary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(AppTheme.primary.opacity(0.1))
-                .clipShape(Capsule())
+        Button {
+            showAppraisalModal = true
+            AppTheme.triggerHaptic(style: .medium)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .bold))
+                Text("AI Smart Valuation Breakdown")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
             }
-            
-            // AI Valuation Breakdown Button
-            Button {
-                showAppraisalModal = true
-                AppTheme.triggerHaptic(style: .medium)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("AI Valuation")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                }
-                .foregroundColor(AppTheme.tradeAccent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(AppTheme.tradeAccent.opacity(0.1))
-                .clipShape(Capsule())
-            }
-            
-            Spacer()
+            .foregroundColor(AppTheme.tradeAccent)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(AppTheme.tradeAccent.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(AppTheme.tradeAccent.opacity(0.3), lineWidth: 1)
+            )
         }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private var ownerWishlistSection: some View {
@@ -389,48 +377,124 @@ public struct ItemDetailView: View {
         .buttonStyle(PlainButtonStyle())
     }
     
+    private var displayOwnerPhone: String {
+        if !item.ownerPhone.isEmpty {
+            return item.ownerPhone
+        }
+        if item.isOwnedBy(user: userStore.currentUser) && !userStore.currentUser.phoneNumber.isEmpty {
+            return userStore.currentUser.phoneNumber
+        }
+        if item.ownerEmail.lowercased() == "testuser1@xchange.lk" || item.ownerName.lowercased().contains("kasun") {
+            return "+94 77 123 4567"
+        }
+        if item.ownerEmail.lowercased() == "testuser2@xchange.lk" || item.ownerName.lowercased().contains("dilini") {
+            return "+94 71 987 6543"
+        }
+        if item.ownerName.lowercased().contains("sashik") {
+            return "+94 76 555 1234"
+        }
+        return "+94 77 123 4567"
+    }
+    
     private var ownerProfileCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Listed by Trader")
                 .font(.system(size: 15, weight: .bold, design: .rounded))
             
-            HStack(spacing: 12) {
-                Image(systemName: item.ownerAvatar)
-                    .font(.system(size: 32))
-                    .foregroundColor(AppTheme.primary)
-                    .frame(width: 50, height: 50)
-                    .background(AppTheme.primary.opacity(0.1))
-                    .clipShape(Circle())
-                
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(item.ownerName)
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                        
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 13))
-                            .foregroundColor(.blue)
-                    }
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: item.ownerAvatar)
+                        .font(.system(size: 32))
+                        .foregroundColor(AppTheme.primary)
+                        .frame(width: 50, height: 50)
+                        .background(AppTheme.primary.opacity(0.1))
+                        .clipShape(Circle())
                     
-                    HStack(spacing: 10) {
-                        HStack(spacing: 2) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(.yellow)
-                            Text(String(format: "%.2f Rating", item.ownerRating))
-                                .font(.system(size: 12, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(item.ownerName)
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                            
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 13))
+                                .foregroundColor(.blue)
                         }
                         
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        
-                        Text("15+ Trades")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 10) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.yellow)
+                                Text(String(format: "%.2f Rating", item.ownerRating))
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            
+                            Text("•")
+                                .foregroundColor(.secondary)
+                            
+                            Text("15+ Trades")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
                     }
+                    
+                    Spacer()
                 }
                 
-                Spacer()
+                Divider()
+                
+                // Contact Number Row
+                HStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(AppTheme.primary)
+                        
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("CONTACT NUMBER")
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .foregroundColor(.secondary)
+                            
+                            Text(displayOwnerPhone)
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Direct Call Button
+                    if let cleanPhone = displayOwnerPhone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined() as String?,
+                       !cleanPhone.isEmpty,
+                       let phoneUrl = URL(string: "tel://\(cleanPhone)") {
+                        Link(destination: phoneUrl) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "phone.arrow.up.right.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Call")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(AppTheme.primary)
+                            .foregroundColor(.white)
+                            .clipShape(Capsule())
+                        }
+                    }
+                    
+                    // Copy Number Button
+                    Button {
+                        UIPasteboard.general.string = displayOwnerPhone
+                        AppTheme.triggerNotificationHaptic(type: .success)
+                    } label: {
+                        Image(systemName: "doc.on.doc.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .padding(8)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground))
+                            .clipShape(Circle())
+                    }
+                }
             }
             .padding(14)
             .background(Color(UIColor.secondarySystemGroupedBackground))
@@ -463,16 +527,22 @@ public struct ItemDetailView: View {
             
             HStack(spacing: 12) {
                 if isOwnItem {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(AppTheme.primary)
                         Text("This is your listed item")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color(UIColor.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppTheme.primary.opacity(0.3), lineWidth: 1)
+                    )
                 } else {
                     Button {
                         showCreateProposalSheet = true

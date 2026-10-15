@@ -1,4 +1,4 @@
-﻿//
+//
 //  CounterOfferModalView.swift
 //  Xchange
 //
@@ -27,7 +27,7 @@ public struct CounterOfferModalView: View {
     }
     
     private var myAvailableItems: [Item] {
-        itemStore.userItems(for: userStore.currentUser.id)
+        itemStore.userItems(for: userStore.currentUser)
     }
     
     private var partnerItems: [Item] {

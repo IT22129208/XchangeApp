@@ -4,7 +4,8 @@
 //
 //  Created for Xchange - Peer-to-Peer Barter App
 //  Pixel-perfect implementation of the official Xchange Home Landing Interface
-//  greets authenticated users with Featured Exchanges, Categories & Active Listings
+//  greets authenticated users with Categories at the top, real-time auto-filtering search,
+//  and scrollable Recent Listings with Sri Lanka locations and LKR currency
 //
 
 import SwiftUI
@@ -18,12 +19,28 @@ public struct HomeLandingView: View {
     
     @State private var searchText: String = ""
     @State private var selectedItemForDetail: Item? = nil
-    @State private var selectedCategoryFilter: ItemCategory? = nil
+    @State private var selectedCategoryFilter: ItemCategory = .all
     
     // Official theme brand colors
     private let fieldBorderGreen = Color(red: 0.24, green: 0.65, blue: 0.38)
     private let fieldDarkBackground = Color(red: 0.08, green: 0.11, blue: 0.13)
     private let cardBackground = Color(red: 0.09, green: 0.12, blue: 0.14)
+    
+    // Categories to display at the top
+    private let displayCategories: [ItemCategory] = [
+        .all,
+        .electronics,
+        .vehicles,
+        .collectibles,
+        .services,
+        .cameras,
+        .gaming,
+        .fashion,
+        .musicalInstruments,
+        .outdoorSports,
+        .booksMedia,
+        .homeGarden
+    ]
     
     public init(onNavigateToBrowse: (() -> Void)? = nil, onAddListing: (() -> Void)? = nil) {
         self.onNavigateToBrowse = onNavigateToBrowse
@@ -39,12 +56,42 @@ public struct HomeLandingView: View {
         if !username.isEmpty {
             return username.capitalized
         }
-        let emailPrefix = userStore.currentUser.email.components(separatedBy: "@").first ?? ""
-        if !emailPrefix.isEmpty {
-            let formatted = emailPrefix.replacingOccurrences(of: ".", with: " ").capitalized
-            return formatted.components(separatedBy: " ").first ?? formatted
-        }
         return "Trader"
+    }
+    
+    // Auto-filtered recent items reacting instantly to search text and category filter
+    private var filteredRecentItems: [Item] {
+        itemStore.items.filter { item in
+            // Only available or in-trade items
+            guard item.status != .traded else { return false }
+            
+            // Category filter check
+            if selectedCategoryFilter != .all {
+                guard item.category == selectedCategoryFilter else { return false }
+            }
+            
+            // Real-time search query filtering (does not wait for submit button)
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !query.isEmpty {
+                let matchesTitle = item.title.localizedCaseInsensitiveContains(query)
+                let matchesDesc = item.description.localizedCaseInsensitiveContains(query)
+                let matchesTags = item.tags.contains(where: { $0.localizedCaseInsensitiveContains(query) })
+                let matchesTrades = item.preferredTrades.localizedCaseInsensitiveContains(query)
+                let matchesLocation = item.ownerLocation.localizedCaseInsensitiveContains(query)
+                let matchesCategory = item.category.rawValue.localizedCaseInsensitiveContains(query)
+                guard matchesTitle || matchesDesc || matchesTags || matchesTrades || matchesLocation || matchesCategory else {
+                    return false
+                }
+            }
+            
+            return true
+        }
+        .sorted { $0.createdAt > $1.createdAt }
+    }
+    
+    // User's own active listings (strictly specific to the logged-in user only)
+    private var myActiveItems: [Item] {
+        itemStore.items.filter { $0.isOwnedBy(user: userStore.currentUser) && $0.status == .available }
     }
     
     public var body: some View {
@@ -60,30 +107,30 @@ public struct HomeLandingView: View {
                 // Scrollable Landing Page Content
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        // 1. Welcome Greeting Header
-                        Text("Welcome, \(greetingName)!")
-                            .font(.system(size: 26, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
+                        // 1. Welcome Greeting Header with Sri Lanka location badge
+                        welcomeGreetingHeader
                             .padding(.horizontal, 20)
-                            .padding(.top, 18)
+                            .padding(.top, 16)
                         
-                        // 2. Search Bar
+                        // 2. Real-time Auto-Filtering Search Bar
                         searchBar
                             .padding(.horizontal, 20)
                             .padding(.top, 14)
                         
-                        // 3. Featured Exchanges Section
-                        featuredExchangesSection
-                            .padding(.top, 22)
+                        // 3. Categories Section at the TOP
+                        categoriesTopSection
+                            .padding(.top, 20)
                         
-                        // 4. Categories Section
-                        categoriesSection
-                            .padding(.top, 22)
+                        // 4. My Active Listings Section (if user has items)
+                        if !myActiveItems.isEmpty {
+                            myActiveListingsSection
+                                .padding(.top, 22)
+                        }
                         
-                        // 5. My Active Listings Section
-                        myActiveListingsSection
+                        // 5. Recent Listings Section (Downward scrollable list)
+                        recentListingsSection
                             .padding(.top, 22)
-                            .padding(.bottom, 90) // Extra padding for custom floating tab bar
+                            .padding(.bottom, 120) // Clearance for custom floating bottom navigation bar
                     }
                 }
             }
@@ -110,32 +157,68 @@ public struct HomeLandingView: View {
         .shadow(color: Color.black.opacity(0.3), radius: 10, y: 4)
     }
     
-    // MARK: - Search Bar
+    // MARK: - Welcome Greeting Header
+    
+    private var welcomeGreetingHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Welcome, \(greetingName)!")
+                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+            
+            HStack(spacing: 5) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(fieldBorderGreen)
+                
+                Text(userStore.currentUser.location)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color.gray.opacity(0.85))
+                
+                Text("•")
+                    .foregroundColor(Color.gray.opacity(0.6))
+                
+                Text("LKR Currency Active")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(fieldBorderGreen)
+            }
+        }
+    }
+    
+    // MARK: - Real-time Auto-Filtering Search Bar
     
     private var searchBar: some View {
         HStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundColor(fieldBorderGreen)
+            
             TextField(
                 "",
                 text: $searchText,
-                prompt: Text("Search").foregroundColor(Color.gray.opacity(0.7))
+                prompt: Text("Search items, categories, or locations in Sri Lanka...").foregroundColor(Color.gray.opacity(0.65))
             )
             .font(.system(size: 15, weight: .medium))
             .foregroundColor(.white)
             .autocapitalization(.none)
             .disableAutocorrection(true)
+            .onChange(of: searchText) { _, newValue in
+                // Automatically syncs to shared ItemStore query without waiting for button press
+                itemStore.searchQuery = newValue
+            }
             
-            Button {
-                if !searchText.isEmpty {
-                    itemStore.searchQuery = searchText
-                    onNavigateToBrowse?()
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    itemStore.searchQuery = ""
+                    AppTheme.triggerHaptic(style: .light)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color.gray.opacity(0.8))
                 }
-            } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundColor(fieldBorderGreen)
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 16)
         .frame(height: 48)
         .background(fieldDarkBackground)
         .clipShape(Capsule())
@@ -145,39 +228,65 @@ public struct HomeLandingView: View {
         )
     }
     
-    // MARK: - Featured Exchanges Section
+    // MARK: - Categories Section at the TOP
     
-    private var featuredExchangesSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Featured Exchanges")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
+    private var categoriesTopSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Categories")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                if selectedCategoryFilter != .all {
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedCategoryFilter = .all
+                            itemStore.selectedCategory = .all
+                        }
+                        AppTheme.triggerHaptic(style: .light)
+                    } label: {
+                        Text("Reset to All")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(fieldBorderGreen)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
             
+            // Horizontal scroll of categories for quick one-tap filtering
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    // Card 1: Vintage Bike
-                    featuredCard(
-                        title: "Vintage Bike",
-                        itemLookupTitle: "Vintage Bike"
-                    ) {
-                        VintageBikeArtworkView()
-                    }
-                    
-                    // Card 2: DSLR Camera
-                    featuredCard(
-                        title: "DSLR Camera",
-                        itemLookupTitle: "DSLR Camera"
-                    ) {
-                        DSLRCameraArtworkView()
-                    }
-                    
-                    // Card 3: Rare Book
-                    featuredCard(
-                        title: "Rare Book",
-                        itemLookupTitle: "Rare Book"
-                    ) {
-                        RareBookArtworkView()
+                HStack(spacing: 10) {
+                    ForEach(displayCategories) { category in
+                        let isSelected = selectedCategoryFilter == category
+                        Button {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedCategoryFilter = category
+                                itemStore.selectedCategory = category
+                            }
+                            AppTheme.triggerHaptic(style: .light)
+                        } label: {
+                            HStack(spacing: 7) {
+                                Image(systemName: category.systemIcon)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(isSelected ? .black : fieldBorderGreen)
+                                
+                                Text(category.chipTitle)
+                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium, design: .rounded))
+                                    .foregroundColor(isSelected ? .black : .white)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(isSelected ? fieldBorderGreen : fieldDarkBackground)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(isSelected ? Color.clear : fieldBorderGreen.opacity(0.4), lineWidth: 1.2)
+                            )
+                            .shadow(color: isSelected ? fieldBorderGreen.opacity(0.35) : Color.clear, radius: 6, y: 2)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.horizontal, 20)
@@ -185,171 +294,264 @@ public struct HomeLandingView: View {
         }
     }
     
-    private func featuredCard<Art: View>(
-        title: String,
-        itemLookupTitle: String,
-        @ViewBuilder artwork: () -> Art
-    ) -> some View {
-        Button {
-            AppTheme.triggerHaptic(style: .light)
-            if let item = itemStore.items.first(where: { $0.title.localizedCaseInsensitiveContains(itemLookupTitle) }) {
-                selectedItemForDetail = item
-            } else if let firstItem = itemStore.items.first {
-                selectedItemForDetail = firstItem
-            }
-        } label: {
-            ZStack(alignment: .bottomLeading) {
-                // Card Background & Artwork
-                ZStack {
-                    LinearGradient(
-                        colors: [Color(white: 0.16), Color(white: 0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    
-                    artwork()
-                }
-                .frame(width: 154, height: 185)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                
-                // Top-Left Verified Badge
-                VStack {
-                    HStack {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(fieldBorderGreen)
-                            
-                            Text("Verified")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(fieldBorderGreen)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.75))
-                        .clipShape(Capsule())
-                        
-                        Spacer()
-                    }
-                    .padding(10)
-                    
-                    Spacer()
-                }
-                
-                // Bottom Gradient Scrim & Item Title
-                VStack(alignment: .leading, spacing: 0) {
-                    Spacer()
-                    
-                    LinearGradient(
-                        colors: [Color.clear, Color.black.opacity(0.85)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 55)
-                    .overlay(
-                        HStack {
-                            Text(title)
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10),
-                        alignment: .bottomLeading
-                    )
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-            }
-            .frame(width: 154, height: 185)
-            .shadow(color: Color.black.opacity(0.4), radius: 8, y: 4)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
+    // MARK: - Recent Listings Section (Scrollable Downward List)
     
-    // MARK: - Categories Section
-    
-    private var categoriesSection: some View {
+    private var recentListingsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Categories")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-            
-            HStack(spacing: 0) {
-                // 1. Electronics
-                categoryButton(
-                    title: "Electronics",
-                    icon: "laptopcomputer.and.iphone",
-                    category: .electronics
-                )
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recent Listings")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    if !searchText.isEmpty {
+                        Text("Filtered by: \"\(searchText)\"")
+                            .font(.system(size: 12))
+                            .foregroundColor(fieldBorderGreen)
+                    } else if selectedCategoryFilter != .all {
+                        Text("Category: \(selectedCategoryFilter.rawValue)")
+                            .font(.system(size: 12))
+                            .foregroundColor(fieldBorderGreen)
+                    }
+                }
                 
-                // 2. Vehicles
-                categoryButton(
-                    title: "Vehicles",
-                    icon: "car.fill",
-                    category: .vehicles
-                )
+                Spacer()
                 
-                // 3. Collectibles
-                categoryButton(
-                    title: "Collectibles",
-                    icon: "shield.fill",
-                    category: .collectibles
-                )
-                
-                // 4. Services
-                categoryButton(
-                    title: "Services",
-                    icon: "wrench.and.screwdriver.fill",
-                    category: .services
-                )
+                Text("\(filteredRecentItems.count) items")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundColor(fieldBorderGreen)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(fieldBorderGreen.opacity(0.12))
+                    .clipShape(Capsule())
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
+            
+            // Vertical Scrollable List of Recent Added Items
+            if filteredRecentItems.isEmpty {
+                emptyRecentListingsView
+                    .padding(.horizontal, 20)
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(filteredRecentItems) { item in
+                        recentListingCard(item: item)
+                            .onTapGesture {
+                                AppTheme.triggerHaptic(style: .light)
+                                selectedItemForDetail = item
+                            }
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
         }
     }
     
-    private func categoryButton(
-        title: String,
-        icon: String,
-        category: ItemCategory
-    ) -> some View {
-        Button {
-            AppTheme.triggerHaptic(style: .light)
-            itemStore.selectedCategory = category
-            onNavigateToBrowse?()
-        } label: {
-            VStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(fieldDarkBackground)
-                        .frame(width: 66, height: 66)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(fieldBorderGreen, lineWidth: 1.5)
-                        )
+    // High-fidelity Recent Listing Card tailored for vertical scroll
+    private func recentListingCard(item: Item) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            // Left Thumbnail
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(red: 0.12, green: 0.15, blue: 0.18))
+                    .frame(width: 90, height: 90)
+                
+                itemImageVisual(item: item)
+                    .frame(width: 90, height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            
+            // Right Details
+            VStack(alignment: .leading, spacing: 5) {
+                // Title & Condition
+                HStack(alignment: .top) {
+                    Text(item.title)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
                     
-                    Image(systemName: icon)
-                        .font(.system(size: 28, weight: .medium))
+                    Spacer()
+                    
+                    if item.isOwnedBy(user: userStore.currentUser) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Your Listing")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(Color(red: 0.4, green: 0.8, blue: 1.0))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(Color.blue.opacity(0.18))
+                        .clipShape(Capsule())
+                    } else {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.2.squarepath")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("Barter")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(fieldBorderGreen)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(fieldBorderGreen.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+                
+                // Category & Sri Lanka Location
+                HStack(spacing: 6) {
+                    HStack(spacing: 4) {
+                        Image(systemName: item.category.systemIcon)
+                            .font(.system(size: 10))
+                        Text(item.category.chipTitle)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(Color.gray.opacity(0.85))
+                    
+                    Text("•")
+                        .foregroundColor(Color.gray.opacity(0.5))
+                        .font(.system(size: 10))
+                    
+                    HStack(spacing: 3) {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 9))
+                        Text(item.ownerLocation)
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(Color.gray.opacity(0.85))
+                }
+                
+                // LKR Estimated Value & Preferred Trade
+                HStack(alignment: .lastTextBaseline) {
+                    Text(item.formattedValue)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundColor(fieldBorderGreen)
+                    
+                    Spacer()
+                    
+                    Text(item.condition.rawValue)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(item.condition.color)
+                }
+                .padding(.top, 2)
+                
+                // Trade Barter Pitch
+                if !item.preferredTrades.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.2.squarepath")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Color.gray)
+                        Text(item.preferredTrades)
+                            .font(.system(size: 11))
+                            .foregroundColor(Color.gray.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                    .padding(.top, 1)
+                }
+            }
+        }
+        .padding(12)
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 6, y: 3)
+    }
+    
+    // Image visual resolution for camera photos, assets, or symbols
+    @ViewBuilder
+    private func itemImageVisual(item: Item) -> some View {
+        if let firstImage = item.images.first, !firstImage.isEmpty {
+            if let customImg = PersistenceService.shared.resolveImage(nameOrPath: firstImage) {
+                Image(uiImage: customImg)
+                    .resizable()
+                    .scaledToFill()
+            } else if UIImage(named: firstImage) != nil {
+                Image(firstImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if UIImage(systemName: firstImage) != nil {
+                ZStack {
+                    Color(red: 0.14, green: 0.18, blue: 0.20)
+                    Image(systemName: firstImage)
+                        .font(.system(size: 32, weight: .medium))
                         .foregroundColor(fieldBorderGreen)
                 }
-                
-                Text(title)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundColor(Color.white.opacity(0.9))
+            } else {
+                Image(firstImage)
+                    .resizable()
+                    .scaledToFill()
             }
-            .frame(maxWidth: .infinity)
+        } else {
+            ZStack {
+                Color(red: 0.14, green: 0.18, blue: 0.20)
+                Image(systemName: item.category.systemIcon)
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundColor(fieldBorderGreen)
+            }
         }
-        .buttonStyle(PlainButtonStyle())
+    }
+    
+    // Empty state when search or category filter yields no matches
+    private var emptyRecentListingsView: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(fieldBorderGreen.opacity(0.12))
+                    .frame(width: 54, height: 54)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(fieldBorderGreen)
+            }
+            
+            Text("No recent listings found")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+            
+            Text("No items match \"\(searchText.isEmpty ? selectedCategoryFilter.rawValue : searchText)\" in Sri Lanka.")
+                .font(.system(size: 13))
+                .foregroundColor(Color.gray.opacity(0.8))
+                .multilineTextAlignment(.center)
+            
+            Button {
+                withAnimation {
+                    searchText = ""
+                    itemStore.searchQuery = ""
+                    selectedCategoryFilter = .all
+                    itemStore.selectedCategory = .all
+                }
+                AppTheme.triggerHaptic(style: .light)
+            } label: {
+                Text("Clear All Filters")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(fieldBorderGreen)
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(28)
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
     
     // MARK: - My Active Listings Section
     
     private var myActiveListingsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("My Active Listings")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 
                 Spacer()
@@ -368,179 +570,44 @@ public struct HomeLandingView: View {
             .padding(.horizontal, 20)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    // Card 1: MacBook Pro
-                    activeListingCard(
-                        title: "MacBook Pro",
-                        itemLookupTitle: "MacBook Pro"
-                    ) {
-                        MacBookProArtworkView()
-                    }
-                    
-                    // Card 2: Graphic Tablet
-                    activeListingCard(
-                        title: "Graphic Tablet",
-                        itemLookupTitle: "Graphic Tablet"
-                    ) {
-                        GraphicTabletArtworkView()
+                HStack(spacing: 12) {
+                    ForEach(myActiveItems) { item in
+                        Button {
+                            AppTheme.triggerHaptic(style: .light)
+                            selectedItemForDetail = item
+                        } label: {
+                            HStack(spacing: 10) {
+                                itemImageVisual(item: item)
+                                    .frame(width: 48, height: 48)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title)
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    
+                                    Text(item.formattedValue)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(fieldBorderGreen)
+                                }
+                                
+                                Spacer(minLength: 4)
+                            }
+                            .padding(8)
+                            .frame(width: 190, height: 64)
+                            .background(cardBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.horizontal, 20)
             }
-        }
-    }
-    
-    private func activeListingCard<Art: View>(
-        title: String,
-        itemLookupTitle: String,
-        @ViewBuilder artwork: () -> Art
-    ) -> some View {
-        Button {
-            AppTheme.triggerHaptic(style: .light)
-            if let item = itemStore.items.first(where: { $0.title.localizedCaseInsensitiveContains(itemLookupTitle) }) {
-                selectedItemForDetail = item
-            }
-        } label: {
-            HStack(spacing: 14) {
-                // Left thumbnail artwork in clean rounded box
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white)
-                        .frame(width: 58, height: 58)
-                    
-                    artwork()
-                        .frame(width: 48, height: 48)
-                }
-                
-                // Right title & status
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(fieldBorderGreen)
-                            .frame(width: 6, height: 6)
-                        Text("Active Barter")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color.gray.opacity(0.85))
-                    }
-                }
-                
-                Spacer(minLength: 8)
-            }
-            .padding(10)
-            .frame(width: 210, height: 78)
-            .background(cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.3), radius: 6, y: 3)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Specialized High-Fidelity Artwork Views
-
-private struct VintageBikeArtworkView: View {
-    var body: some View {
-        ZStack {
-            Color(red: 0.14, green: 0.18, blue: 0.20)
-            
-            VStack(spacing: 4) {
-                Image(systemName: "bicycle")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 105, height: 68)
-                    .foregroundColor(Color(red: 0.38, green: 0.76, blue: 0.72)) // Vintage Mint
-                    .shadow(color: Color.black.opacity(0.4), radius: 4, y: 2)
-            }
-            .padding(.bottom, 20)
-        }
-    }
-}
-
-private struct DSLRCameraArtworkView: View {
-    var body: some View {
-        ZStack {
-            Color(red: 0.16, green: 0.18, blue: 0.21)
-            
-            VStack(spacing: 4) {
-                Image(systemName: "camera.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 85, height: 68)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(white: 0.85), Color(white: 0.45)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color(red: 0.24, green: 0.65, blue: 0.38), lineWidth: 2)
-                            .frame(width: 32, height: 32)
-                            .offset(y: 4)
-                    )
-                    .shadow(color: Color.black.opacity(0.5), radius: 6, y: 3)
-            }
-            .padding(.bottom, 20)
-        }
-    }
-}
-
-private struct RareBookArtworkView: View {
-    var body: some View {
-        ZStack {
-            Color(red: 0.20, green: 0.16, blue: 0.14) // Warm antique tone
-            
-            VStack(spacing: 4) {
-                Image(systemName: "books.vertical.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 78, height: 70)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(red: 0.82, green: 0.68, blue: 0.42), Color(red: 0.55, green: 0.40, blue: 0.25)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .shadow(color: Color.black.opacity(0.5), radius: 6, y: 3)
-            }
-            .padding(.bottom, 20)
-        }
-    }
-}
-
-private struct MacBookProArtworkView: View {
-    var body: some View {
-        ZStack {
-            Color.white
-            Image(systemName: "laptopcomputer")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 38, height: 26)
-                .foregroundColor(Color(red: 0.20, green: 0.22, blue: 0.25))
-        }
-    }
-}
-
-private struct GraphicTabletArtworkView: View {
-    var body: some View {
-        ZStack {
-            Color.white
-            Image(systemName: "ipad.and.iphone")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 36, height: 26)
-                .foregroundColor(Color(red: 0.25, green: 0.28, blue: 0.32))
         }
     }
 }

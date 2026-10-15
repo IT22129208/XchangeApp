@@ -9,6 +9,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import AVFoundation
 
 public typealias AddListingView = AddItemView
 
@@ -32,9 +33,14 @@ public struct AddItemView: View {
     @State private var showSmartAppraisal: Bool = false
     @State private var showCategoryPickerSheet: Bool = false
     
-    // Photo Picker State
+    // Photo & Camera Picker State
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedImage: UIImage? = nil
+    @State private var showPhotoActionSheet: Bool = false
+    @State private var showCameraPicker: Bool = false
+    @State private var showPhotosPicker: Bool = false
+    @State private var showCameraPermissionAlert: Bool = false
+    @State private var showCameraUnavailableAlert: Bool = false
     @State private var isPublishing: Bool = false
     @State private var showSuccessAlert: Bool = false
     
@@ -92,9 +98,64 @@ public struct AddItemView: View {
             categorySelectionSheet
         }
         .sheet(isPresented: $showSmartAppraisal) {
-            SmartAppraisalModalView(initialTitle: itemName) { result in
+            SmartAppraisalModalView(
+                initialTitle: itemName,
+                initialCategory: selectedCategory,
+                initialCondition: itemCondition,
+                initialImage: selectedImage,
+                initialEstimatedValue: parseEstimatedValue(from: valueOrTradeAmount)
+            ) { result in
                 applyAppraisalResult(result)
             }
+        }
+        .sheet(isPresented: $showCameraPicker) {
+            CameraPickerView(selectedImage: $selectedImage)
+                .ignoresSafeArea()
+        }
+        .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPhotoItem, matching: .images)
+        .confirmationDialog("Add Item Photo", isPresented: $showPhotoActionSheet, titleVisibility: .visible) {
+            Button {
+                checkAndOpenCamera()
+            } label: {
+                Label("Open Camera & Take Photo", systemImage: "camera.fill")
+            }
+            
+            Button {
+                AppTheme.triggerHaptic(style: .light)
+                showPhotosPicker = true
+            } label: {
+                Label("Choose from Photo Library", systemImage: "photo.on.rectangle")
+            }
+            
+            if selectedImage != nil {
+                Button("Remove Photo", role: .destructive) {
+                    withAnimation {
+                        selectedImage = nil
+                        selectedPhotoItem = nil
+                    }
+                    AppTheme.triggerHaptic(style: .light)
+                }
+            }
+            
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Camera Unavailable", isPresented: $showCameraUnavailableAlert) {
+            Button("Choose from Library") {
+                showPhotosPicker = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The camera is not available on this device or simulator. Would you like to select an image from your photo library instead?")
+        }
+        .alert("Camera Permission Required", isPresented: $showCameraPermissionAlert) {
+            Button("Open Settings") {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("XChange needs access to your camera so you can take photos of your items to list them for barter. Please enable Camera in iOS Settings.")
         }
         .alert("Listing Published!", isPresented: $showSuccessAlert) {
             Button("View in Marketplace") {
@@ -164,70 +225,186 @@ public struct AddItemView: View {
     // MARK: - Photo Upload Box
     
     private var photoUploadBox: some View {
-        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(photoBoxBg)
-                    .frame(height: 200)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(selectedImage != nil ? accentGreen : Color.white.opacity(0.06), lineWidth: selectedImage != nil ? 1.5 : 1)
-                    )
-                
-                if let selectedImage = selectedImage {
-                    // Show Selected Image
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(photoBoxBg)
+                .frame(height: 210)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(selectedImage != nil ? accentGreen : Color.white.opacity(0.08), lineWidth: selectedImage != nil ? 1.5 : 1)
+                )
+            
+            if let selectedImage = selectedImage {
+                // Show Selected / Attached Image
+                ZStack {
                     Image(uiImage: selectedImage)
                         .resizable()
                         .scaledToFill()
                         .frame(maxWidth: .infinity)
-                        .frame(height: 200)
+                        .frame(height: 210)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     
-                    // Overlay "Change Photo" / Clear control
                     VStack {
+                        // Top Badges & Remove Button
                         HStack {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(accentGreen)
+                                Text("Photo Attached")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.black.opacity(0.72))
+                            .clipShape(Capsule())
+                            
                             Spacer()
+                            
                             Button {
-                                self.selectedImage = nil
-                                self.selectedPhotoItem = nil
+                                withAnimation(.spring(response: 0.3)) {
+                                    self.selectedImage = nil
+                                    self.selectedPhotoItem = nil
+                                }
+                                AppTheme.triggerHaptic(style: .light)
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 22))
+                                    .font(.system(size: 24))
                                     .foregroundColor(.white)
-                                    .background(Color.black.opacity(0.6).clipShape(Circle()))
+                                    .background(Color.black.opacity(0.65).clipShape(Circle()))
                             }
-                            .padding(10)
                         }
+                        .padding(12)
+                        
                         Spacer()
                         
-                        HStack {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("Tap to change photo")
-                                .font(.system(size: 12, weight: .semibold))
+                        // Bottom Action Controls: Retake with Camera OR Pick from Library
+                        HStack(spacing: 10) {
+                            Button {
+                                checkAndOpenCamera()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 12, weight: .bold))
+                                    Text("Retake Photo")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.75))
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Button {
+                                AppTheme.triggerHaptic(style: .light)
+                                showPhotosPicker = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "photo.on.rectangle")
+                                        .font(.system(size: 12, weight: .bold))
+                                    Text("Change from Library")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.75))
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(Capsule())
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 12)
                     }
-                } else {
-                    // Empty state matching user reference screenshot
-                    VStack(spacing: 12) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 44, weight: .regular))
-                            .foregroundColor(accentGreen)
+                }
+            } else {
+                // Empty state with explicit, prominent "Open Camera" and "Photo Library" options
+                VStack(spacing: 12) {
+                    // Pulsing camera icon badge
+                    ZStack {
+                        Circle()
+                            .fill(accentGreen.opacity(0.12))
+                            .frame(width: 56, height: 56)
                         
-                        Text("Tap to Add Photos")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.white)
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundColor(accentGreen)
                     }
+                    
+                    VStack(spacing: 3) {
+                        Text("Add Item Photo")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("Snap a picture with your camera or select from library")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(Color.gray.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 16)
+                    }
+                    
+                    // Two prominent action buttons: 1) Open Camera, 2) Photo Library
+                    HStack(spacing: 12) {
+                        // Open Camera Button
+                        Button {
+                            checkAndOpenCamera()
+                        } label: {
+                            HStack(spacing: 7) {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("Open Camera")
+                                    .font(.system(size: 13, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 9)
+                            .background(accentGreen)
+                            .clipShape(Capsule())
+                            .shadow(color: accentGreen.opacity(0.35), radius: 6, y: 2)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Photo Library Button
+                        Button {
+                            AppTheme.triggerHaptic(style: .light)
+                            showPhotosPicker = true
+                        } label: {
+                            HStack(spacing: 7) {
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Photo Library")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.top, 2)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    showPhotoActionSheet = true
                 }
             }
         }
-        .buttonStyle(PlainButtonStyle())
     }
     
     // MARK: - Field 1: Item Name
@@ -260,7 +437,7 @@ public struct AddItemView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
             
-            TextField("", text: $valueOrTradeAmount, prompt: Text("e.g., $300 or Trade").foregroundColor(Color.gray.opacity(0.6)))
+            TextField("", text: $valueOrTradeAmount, prompt: Text("e.g., LKR 45,000 or Trade").foregroundColor(Color.gray.opacity(0.6)))
                 .font(.system(size: 15))
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
@@ -514,7 +691,7 @@ public struct AddItemView: View {
         }
         selectedCategory = result.predictedCategory
         itemCondition = result.predictedCondition
-        valueOrTradeAmount = "$\(Int(result.estimatedFairValue))"
+        valueOrTradeAmount = "LKR \(Int(result.estimatedFairValue))"
         itemDescription = "Condition: \(result.predictedCondition.rawValue). Auto-appraised tags: \(result.suggestedTags.joined(separator: ", "))"
     }
     
@@ -553,6 +730,8 @@ public struct AddItemView: View {
             images: imageFilenames,
             ownerId: userStore.currentUser.id,
             ownerName: userStore.currentUser.displayName,
+            ownerEmail: userStore.currentUser.email,
+            ownerPhone: userStore.currentUser.phoneNumber,
             ownerAvatar: userStore.currentUser.avatar,
             ownerRating: userStore.currentUser.rating,
             ownerLocation: userStore.currentUser.location,
@@ -562,6 +741,14 @@ public struct AddItemView: View {
         )
         
         itemStore.addItem(newItem)
+        
+        // Synchronize new item with image to Firebase Realtime Database
+        let itemToPublish = newItem
+        let imageToPublish = selectedImage
+        Task { @MainActor in
+            await FirebaseDatabaseService.shared.publishItem(itemToPublish, image: imageToPublish)
+        }
+        
         AppTheme.triggerNotificationHaptic(type: .success)
         isPublishing = false
         showSuccessAlert = true
@@ -569,7 +756,36 @@ public struct AddItemView: View {
     
     private func parseEstimatedValue(from text: String) -> Double {
         let digits = text.filter { "0123456789.".contains($0) }
-        return Double(digits) ?? 150.0
+        return Double(digits) ?? 25000.0
+    }
+    
+    private func checkAndOpenCamera() {
+        AppTheme.triggerHaptic(style: .medium)
+        
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            showCameraUnavailableAlert = true
+            return
+        }
+        
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        switch authStatus {
+        case .authorized:
+            showCameraPicker = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self.showCameraPicker = true
+                    } else {
+                        self.showCameraPermissionAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showCameraPermissionAlert = true
+        @unknown default:
+            showCameraPicker = true
+        }
     }
     
     private func resetForm() {
@@ -580,6 +796,59 @@ public struct AddItemView: View {
         selectedPhotoItem = nil
         itemDescription = ""
         itemCondition = .likeNew
+    }
+}
+
+// MARK: - Camera Picker View (UIViewControllerRepresentable)
+
+public struct CameraPickerView: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
+    
+    public init(selectedImage: Binding<UIImage?>) {
+        self._selectedImage = selectedImage
+    }
+    
+    public func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+            picker.cameraCaptureMode = .photo
+            picker.cameraDevice = .rear
+        } else {
+            picker.sourceType = .photoLibrary
+        }
+        picker.allowsEditing = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    public func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    public class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: CameraPickerView
+        
+        init(_ parent: CameraPickerView) {
+            self.parent = parent
+        }
+        
+        public func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let editedImage = info[.editedImage] as? UIImage {
+                parent.selectedImage = editedImage
+            } else if let originalImage = info[.originalImage] as? UIImage {
+                parent.selectedImage = originalImage
+            }
+            AppTheme.triggerNotificationHaptic(type: .success)
+            parent.dismiss()
+        }
+        
+        public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
     }
 }
 

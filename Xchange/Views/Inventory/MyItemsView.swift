@@ -15,7 +15,7 @@ public struct MyItemsView: View {
     @State private var selectedItemForDetail: Item? = nil
     
     private var myItems: [Item] {
-        itemStore.userItems(for: userStore.currentUser.id)
+        itemStore.userItems(for: userStore.currentUser)
     }
     
     private var totalInventoryValue: Double {
@@ -94,7 +94,7 @@ public struct MyItemsView: View {
                             .font(.system(size: 10, weight: .heavy, design: .rounded))
                             .foregroundColor(.white.opacity(0.85))
                         
-                        Text("$\(Int(totalInventoryValue))")
+                        Text("LKR \(Int(totalInventoryValue))")
                             .font(.system(size: 28, weight: .black, design: .rounded))
                             .foregroundColor(.white)
                     }

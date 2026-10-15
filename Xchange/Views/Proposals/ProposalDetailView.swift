@@ -1,4 +1,4 @@
-﻿//
+//
 //  ProposalDetailView.swift
 //  Xchange
 //
@@ -30,7 +30,7 @@ public struct ProposalDetailView: View {
     
     private var isIncoming: Bool {
         guard let p = proposal else { return false }
-        return p.receiverId == userStore.currentUser.id
+        return p.isIncoming(for: userStore.currentUser)
     }
     
     private var partnerName: String {
@@ -195,7 +195,7 @@ public struct ProposalDetailView: View {
                         .font(.system(size: 10, weight: .heavy, design: .rounded))
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("Total: $\(Int(p.totalOfferedValue))")
+                    Text("Total: LKR \(Int(p.totalOfferedValue))")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(AppTheme.primary)
                 }
@@ -230,7 +230,7 @@ public struct ProposalDetailView: View {
                         .font(.system(size: 10, weight: .heavy, design: .rounded))
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("Total: $\(Int(p.totalRequestedValue))")
+                    Text("Total: LKR \(Int(p.totalRequestedValue))")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(AppTheme.tradeAccent)
                 }

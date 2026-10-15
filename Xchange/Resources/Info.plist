@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>XChange uses the camera to scan and appraise physical trade items using Apple Vision and CoreML.</string>
+	<string>XChange uses the camera to take photos of items for barter listings and appraise physical trade items using Apple Vision and CoreML.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>XChange accesses your photos to select item images for barter listings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

@@ -1,4 +1,4 @@
-﻿//
+//
 //  CreateProposalView.swift
 //  Xchange
 //
@@ -20,7 +20,7 @@ public struct CreateProposalView: View {
     @State private var showSuccessAlert = false
     
     private var myAvailableItems: [Item] {
-        itemStore.availableItemsToOffer(for: userStore.currentUser.id)
+        itemStore.availableItemsToOffer(for: userStore.currentUser)
     }
     
     private var selectedOfferedItems: [Item] {
@@ -236,6 +236,8 @@ public struct CreateProposalView: View {
                     receiverName: targetItem.ownerName,
                     receiverAvatar: targetItem.ownerAvatar,
                     receiverRating: targetItem.ownerRating,
+                    receiverEmail: targetItem.ownerEmail,
+                    receiverPhone: targetItem.ownerPhone,
                     offeredItems: selectedOfferedItems,
                     requestedItems: [targetItem],
                     note: tradeNote.trimmingCharacters(in: .whitespacesAndNewlines)

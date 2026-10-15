@@ -18,7 +18,7 @@ public struct ProfileView: View {
     
     @AppStorage("isLoggedIn") private var isLoggedIn: Bool = false
     @AppStorage("userLanguage") private var userLanguage: String = "English (US)"
-    @AppStorage("userCurrency") private var userCurrency: String = "USD ($)"
+    @AppStorage("userCurrency") private var userCurrency: String = "LKR (Rs)"
     @AppStorage("userColorScheme") private var userColorScheme: String = "dark"
     
     @State private var showEditProfileSheet = false
@@ -240,10 +240,27 @@ public struct ProfileView: View {
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
             
-            // Email
-            Text(user.email)
-                .font(.system(size: 13, weight: .regular))
-                .foregroundColor(Color.gray.opacity(0.9))
+            // Email & Contact Number
+            VStack(spacing: 5) {
+                Text(user.email)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(Color.gray.opacity(0.9))
+                
+                if !user.phoneNumber.isEmpty {
+                    HStack(spacing: 5) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(accentGreen)
+                        Text(user.phoneNumber)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.95))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+            }
             
             // Role & Location Subtitle
             HStack(spacing: 6) {
@@ -778,6 +795,7 @@ private struct EditProfileModalView: View {
     @State private var displayName: String = ""
     @State private var username: String = ""
     @State private var email: String = ""
+    @State private var phoneNumber: String = ""
     @State private var location: String = ""
     @State private var bio: String = ""
     
@@ -826,8 +844,16 @@ private struct EditProfileModalView: View {
                             )
                             
                             inputField(
+                                label: "Contact Number",
+                                placeholder: "e.g., +94 77 123 4567",
+                                text: $phoneNumber,
+                                icon: "phone.fill",
+                                keyboardType: .phonePad
+                            )
+                            
+                            inputField(
                                 label: "Location",
-                                placeholder: "e.g., San Francisco, CA",
+                                placeholder: "e.g., Colombo, Sri Lanka",
                                 text: $location,
                                 icon: "mappin.circle.fill"
                             )
@@ -900,6 +926,7 @@ private struct EditProfileModalView: View {
                 displayName = user.displayName
                 username = user.username
                 email = user.email
+                phoneNumber = user.phoneNumber
                 location = user.location
                 bio = user.bio
             }
@@ -1048,8 +1075,16 @@ private struct EditProfileModalView: View {
             bio: bio.trimmingCharacters(in: .whitespacesAndNewlines),
             location: location.trimmingCharacters(in: .whitespacesAndNewlines),
             email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-            username: username.trimmingCharacters(in: .whitespacesAndNewlines)
+            username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+            phoneNumber: phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+        
+        // Synchronize profile changes to Firebase Realtime Database
+        let updatedUser = userStore.currentUser
+        let avatarImg = selectedImage
+        Task { @MainActor in
+            await FirebaseDatabaseService.shared.saveUserProfile(updatedUser, avatarImage: avatarImg)
+        }
         
         AppTheme.triggerNotificationHaptic(type: .success)
         dismiss()
@@ -1103,7 +1138,7 @@ private struct CurrencySelectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedCurrency: String
     
-    let currencies = ["USD ($)", "EUR (€)", "GBP (£)", "JPY (¥)", "CAD ($)", "AUD ($)", "LKR (Rs)"]
+    let currencies = ["LKR (Rs)", "USD ($)", "EUR (€)", "GBP (£)", "JPY (¥)", "CAD ($)", "AUD ($)"]
     
     var body: some View {
         NavigationStack {

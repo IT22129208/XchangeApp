@@ -1,4 +1,4 @@
-﻿//
+//
 //  SmartAppraisalModalView.swift
 //  Xchange
 //
@@ -14,24 +14,33 @@ public struct SmartAppraisalModalView: View {
     @StateObject private var mlService = SmartAppraisalMLService.shared
     
     var initialTitle: String = ""
+    var initialCategory: ItemCategory? = nil
+    var initialCondition: ItemCondition? = nil
+    var initialImage: UIImage? = nil
+    var initialEstimatedValue: Double? = nil
     var onApplyAppraisal: ((AppraisalResult) -> Void)? = nil
     
-    @State private var sampleCategoryIndex: Int = 0
-    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var itemTitle: String = ""
+    @State private var selectedCategory: ItemCategory = .electronics
+    @State private var selectedCondition: ItemCondition = .likeNew
     @State private var scannedImage: UIImage? = nil
-    @State private var laserOffset: CGFloat = -110
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var laserOffset: CGFloat = -100
     @State private var currentResult: AppraisalResult? = nil
     
-    private let demoPresets = [
-        (title: "Sony WH-1000XM5 Headphones", category: ItemCategory.electronics, icon: "headphones"),
-        (title: "Fujifilm X-T30 II Mirrorless", category: ItemCategory.cameras, icon: "camera.fill"),
-        (title: "Analogue Pocket Console", category: ItemCategory.gaming, icon: "gamecontroller.fill"),
-        (title: "Teenage Engineering OP-1 Synth", category: ItemCategory.musicalInstruments, icon: "guitars.fill"),
-        (title: "Patagonia MLC 45L Backpack", category: ItemCategory.fashion, icon: "tshirt.fill")
-    ]
-    
-    public init(initialTitle: String = "", onApplyAppraisal: ((AppraisalResult) -> Void)? = nil) {
+    public init(
+        initialTitle: String = "",
+        initialCategory: ItemCategory? = nil,
+        initialCondition: ItemCondition? = nil,
+        initialImage: UIImage? = nil,
+        initialEstimatedValue: Double? = nil,
+        onApplyAppraisal: ((AppraisalResult) -> Void)? = nil
+    ) {
         self.initialTitle = initialTitle
+        self.initialCategory = initialCategory
+        self.initialCondition = initialCondition
+        self.initialImage = initialImage
+        self.initialEstimatedValue = initialEstimatedValue
         self.onApplyAppraisal = onApplyAppraisal
     }
     
@@ -42,8 +51,8 @@ public struct SmartAppraisalModalView: View {
                     // Stage 1: Camera Scanner Stage
                     scannerStage
                     
-                    // Stage 2: Quick Benchmark Selector (for Simulator / Lab Testing)
-                    presetPickerSection
+                    // Stage 2: Category Selector
+                    categorySelectorSection
                     
                     // Stage 3: ML Appraisal Results Card
                     if let result = currentResult {
@@ -60,13 +69,23 @@ public struct SmartAppraisalModalView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
             }
             .onAppear {
-                triggerAppraisal(index: 0)
+                initializeAndScan()
+            }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                Task {
+                    if let item = newItem,
+                       let data = try? await item.loadTransferable(type: Data.self),
+                       let img = UIImage(data: data) {
+                        self.scannedImage = img
+                        runAppraisal()
+                    }
+                }
             }
         }
     }
@@ -84,23 +103,35 @@ public struct SmartAppraisalModalView: View {
                         .stroke(AppTheme.primary.opacity(0.3), lineWidth: 1.5)
                 )
             
-            // Item Icon / Camera Preview Simulator
-            VStack(spacing: 12) {
-                let current = demoPresets[sampleCategoryIndex]
-                Image(systemName: current.icon)
-                    .font(.system(size: 68))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [AppTheme.primary, AppTheme.tradeAccent],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+            // Item Image or Category Icon Display
+            if let imageToDisplay = scannedImage ?? initialImage {
+                Image(uiImage: imageToDisplay)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 230)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .overlay(
+                        Color.black.opacity(0.2)
                     )
-                    .shadow(color: AppTheme.primary.opacity(0.5), radius: 16)
-                
-                Text(current.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: selectedCategory.systemIcon)
+                        .font(.system(size: 64))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppTheme.primary, AppTheme.tradeAccent],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: AppTheme.primary.opacity(0.5), radius: 16)
+                    
+                    Text(itemTitle.isEmpty ? "Inspecting \(selectedCategory.rawValue)" : itemTitle)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 24)
+                }
             }
             
             // Reticle Corners
@@ -128,29 +159,27 @@ public struct SmartAppraisalModalView: View {
             .padding(16)
             
             // Animated Scanning Laser Line
-            if mlService.isAnalyzing {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, AppTheme.brandGreen, .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.clear, AppTheme.brandGreen, Color.clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
-                    .frame(height: 3)
-                    .shadow(color: AppTheme.brandGreen, radius: 6)
-                    .offset(y: laserOffset)
-                    .onAppear {
-                        withAnimation(
-                            Animation.easeInOut(duration: 1.2)
-                                .repeatForever(autoreverses: true)
-                        ) {
-                            laserOffset = 110
-                        }
+                )
+                .frame(height: 3)
+                .shadow(color: AppTheme.brandGreen, radius: 6)
+                .offset(y: laserOffset)
+                .onAppear {
+                    withAnimation(
+                        Animation.easeInOut(duration: 1.2)
+                            .repeatForever(autoreverses: true)
+                    ) {
+                        laserOffset = 100
                     }
-            }
+                }
             
-            // Vision Framework Badge
+            // Top Framework Badge & Photo Selector Button
             VStack {
                 HStack {
                     HStack(spacing: 4) {
@@ -165,6 +194,22 @@ public struct SmartAppraisalModalView: View {
                     .clipShape(Capsule())
                     
                     Spacer()
+                    
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "camera.fill")
+                            Text("Scan Photo")
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                    }
                 }
                 Spacer()
             }
@@ -172,24 +217,25 @@ public struct SmartAppraisalModalView: View {
         }
     }
     
-    private var presetPickerSection: some View {
+    private var categorySelectorSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Select Benchmark Device or Photo to Appraise:")
+            Text("Classified Category (Tap to adjust):")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.secondary)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(0..<demoPresets.count, id: \.self) { idx in
-                        let isSelected = sampleCategoryIndex == idx
+                    ForEach(ItemCategory.allCases.filter { $0 != .all }) { cat in
+                        let isSelected = selectedCategory == cat
                         Button {
-                            sampleCategoryIndex = idx
-                            triggerAppraisal(index: idx)
+                            selectedCategory = cat
+                            AppTheme.triggerHaptic(style: .light)
+                            runAppraisal()
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: demoPresets[idx].icon)
+                                Image(systemName: cat.systemIcon)
                                     .font(.system(size: 12))
-                                Text(demoPresets[idx].category.rawValue)
+                                Text(cat.rawValue)
                                     .font(.system(size: 12, weight: .bold, design: .rounded))
                             }
                             .foregroundColor(isSelected ? .white : .primary)
@@ -213,12 +259,12 @@ public struct SmartAppraisalModalView: View {
             // Header with Confidence Badge
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Predicted Fair Value")
+                    Text("Predicted Fair Barter Value")
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .foregroundColor(.secondary)
                     
-                    Text("$\(Int(result.estimatedFairValue)) USD")
-                        .font(.system(size: 32, weight: .black, design: .rounded))
+                    Text("LKR \(Int(result.estimatedFairValue))")
+                        .font(.system(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(AppTheme.primaryGradient)
                 }
                 
@@ -227,7 +273,7 @@ public struct SmartAppraisalModalView: View {
                 // Confidence Pill
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "checkmark.seal.fill")
                             .foregroundColor(AppTheme.tradeAccent)
                         Text(result.formattedConfidence)
                             .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -238,7 +284,7 @@ public struct SmartAppraisalModalView: View {
                     .background(AppTheme.tradeAccent.opacity(0.12))
                     .clipShape(Capsule())
                     
-                    Text("Margin: \(result.formattedValueRange)")
+                    Text("Range: \(result.formattedValueRange)")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
                 }
@@ -269,7 +315,7 @@ public struct SmartAppraisalModalView: View {
                 
                 // Condition Card
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ESTIMATED CONDITION")
+                    Text("CONDITION RATING")
                         .font(.system(size: 9, weight: .heavy))
                         .foregroundColor(.secondary)
                     
@@ -288,20 +334,24 @@ public struct SmartAppraisalModalView: View {
             }
             
             // AI Suggested Tags
-            VStack(alignment: .leading, spacing: 6) {
-                Text("AI Suggested Listing Tags:")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 6) {
-                    ForEach(result.suggestedTags, id: \.self) { tag in
-                        Text("#\(tag)")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(AppTheme.primary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppTheme.primary.opacity(0.08))
-                            .clipShape(Capsule())
+            if !result.suggestedTags.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("AI Suggested Listing Tags:")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.secondary)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(result.suggestedTags, id: \.self) { tag in
+                                Text("#\(tag)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(AppTheme.primary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(AppTheme.primary.opacity(0.08))
+                                    .clipShape(Capsule())
+                            }
+                        }
                     }
                 }
             }
@@ -318,25 +368,40 @@ public struct SmartAppraisalModalView: View {
                     .lineSpacing(2)
             }
             
-            // Action Button: Apply to Listing
-            Button {
-                AppTheme.triggerNotificationHaptic(type: .success)
-                onApplyAppraisal?(result)
-                dismiss()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.seal.fill")
-                    Text("Apply Appraisal to Listing")
+            // Context Action Button
+            if let onApply = onApplyAppraisal {
+                Button {
+                    AppTheme.triggerNotificationHaptic(type: .success)
+                    onApply(result)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill")
+                        Text("Apply Appraisal to Listing")
+                    }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(AppTheme.primaryGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: AppTheme.primary.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(AppTheme.primaryGradient)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: AppTheme.primary.opacity(0.3), radius: 8, x: 0, y: 4)
+                .padding(.top, 6)
+            } else {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Done")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color(UIColor.label))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .padding(.top, 6)
             }
-            .padding(.top, 6)
         }
         .padding(16)
         .modernCard()
@@ -355,14 +420,39 @@ public struct SmartAppraisalModalView: View {
         .modernCard()
     }
     
-    private func triggerAppraisal(index: Int) {
-        laserOffset = -110
-        let preset = demoPresets[index]
+    // MARK: - Appraisal Execution
+    
+    private func initializeAndScan() {
+        itemTitle = initialTitle
+        if let cat = initialCategory {
+            selectedCategory = cat
+        }
+        if let cond = initialCondition {
+            selectedCondition = cond
+        }
+        if let img = initialImage {
+            scannedImage = img
+        }
+        runAppraisal()
+    }
+    
+    private func runAppraisal() {
+        laserOffset = -100
+        let imageToAnalyze = scannedImage ?? initialImage
+        let titleToAnalyze = itemTitle.isEmpty ? initialTitle : itemTitle
+        let cat = selectedCategory
+        let cond = selectedCondition
+        let baseVal = initialEstimatedValue
+        
         Task {
-            let res = await mlService.appraiseImage(UIImage(), fallbackTitle: preset.title)
-            await MainActor.run {
-                self.currentResult = res
-            }
+            let res = await mlService.appraise(
+                title: titleToAnalyze,
+                category: cat,
+                condition: cond,
+                image: imageToAnalyze,
+                baseValue: baseVal
+            )
+            self.currentResult = res
         }
     }
 }

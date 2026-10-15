@@ -17,6 +17,8 @@ public class UserStore: ObservableObject {
     
     private let persistence = PersistenceService.shared
     
+    public static let testUser1Id = UUID(uuidString: "77777777-1111-1111-1111-111111111111")!
+    public static let testUser2Id = UUID(uuidString: "88888888-2222-2222-2222-222222222222")!
     public static let currentUserId = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
     public static let alexUserId = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
     public static let sophiaUserId = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
@@ -29,9 +31,36 @@ public class UserStore: ObservableObject {
         
         var loadedUser: User
         if var stored: User = PersistenceService.shared.load(User.self, from: PersistenceService.FileKey.user) {
+            var needsSave = false
             if stored.displayName.isEmpty || stored.displayName == "Alex" || stored.displayName == "Alex Rivera" {
                 stored.displayName = "Sashik Silva"
                 stored.username = "sashik"
+                needsSave = true
+            }
+            if !stored.location.contains("Sri Lanka") {
+                stored.location = "Malabe, Colombo, Sri Lanka"
+                needsSave = true
+            }
+            if stored.email.lowercased() == "testuser1@xchange.lk" {
+                if stored.id != Self.testUser1Id {
+                    stored.id = Self.testUser1Id
+                    needsSave = true
+                }
+                if stored.phoneNumber.isEmpty || stored.phoneNumber == "+94 76 555 1234" {
+                    stored.phoneNumber = "+94 77 123 4567"
+                    needsSave = true
+                }
+            } else if stored.email.lowercased() == "testuser2@xchange.lk" {
+                if stored.id != Self.testUser2Id {
+                    stored.id = Self.testUser2Id
+                    needsSave = true
+                }
+                if stored.phoneNumber.isEmpty || stored.phoneNumber == "+94 76 555 1234" {
+                    stored.phoneNumber = "+94 71 987 6543"
+                    needsSave = true
+                }
+            }
+            if needsSave {
                 PersistenceService.shared.save(stored, to: PersistenceService.FileKey.user)
             }
             loadedUser = stored
@@ -44,15 +73,41 @@ public class UserStore: ObservableObject {
         self.allUsers = initialUsers
     }
     
+    /// Switches and locks the active user identity and unique ID upon login or signup
+    public func applyUserIdentity(email: String, displayName: String? = nil, firebaseUid: String? = nil) {
+        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let resolvedId: UUID = {
+            if cleanEmail == "testuser1@xchange.lk" {
+                return Self.testUser1Id
+            }
+            if cleanEmail == "testuser2@xchange.lk" {
+                return Self.testUser2Id
+            }
+            if let uid = firebaseUid, !uid.isEmpty {
+                return User.deterministicId(for: uid)
+            }
+            return User.deterministicId(for: cleanEmail)
+        }()
+        
+        currentUser.id = resolvedId
+        currentUser.email = email
+        if let name = displayName, !name.isEmpty {
+            currentUser.displayName = name
+        }
+        let username = cleanEmail.components(separatedBy: "@").first ?? "trader"
+        currentUser.username = username
+        saveCurrentUser()
+    }
+    
     public func saveCurrentUser() {
         persistence.save(currentUser, to: PersistenceService.FileKey.user)
     }
     
     public func updateProfile(displayName: String, bio: String, location: String) {
-        updateProfile(displayName: displayName, bio: bio, location: location, email: nil, username: nil)
+        updateProfile(displayName: displayName, bio: bio, location: location, email: nil, username: nil, phoneNumber: nil)
     }
     
-    public func updateProfile(displayName: String, bio: String, location: String, email: String? = nil, username: String? = nil) {
+    public func updateProfile(displayName: String, bio: String, location: String, email: String? = nil, username: String? = nil, phoneNumber: String? = nil) {
         currentUser.displayName = displayName
         currentUser.bio = bio
         currentUser.location = location
@@ -61,6 +116,9 @@ public class UserStore: ObservableObject {
         }
         if let username = username, !username.isEmpty {
             currentUser.username = username
+        }
+        if let phoneNumber = phoneNumber {
+            currentUser.phoneNumber = phoneNumber
         }
         saveCurrentUser()
         AppTheme.triggerNotificationHaptic(type: .success)
@@ -125,7 +183,8 @@ public class UserStore: ObservableObject {
             email: "sashik@sliit.ac.lk",
             bio: "SLIIT Computing student & tech trader. Swapping audio gear, mechanical keyboards, camera primes, and retro games!",
             avatar: "person.crop.circle.fill",
-            location: "Malabe, Colombo / SF Hub",
+            location: "Malabe, Colombo, Sri Lanka",
+            phoneNumber: "+94 76 555 1234",
             rating: 4.95,
             tradesCompleted: 18,
             memberSince: "Jan 2024",
@@ -170,7 +229,8 @@ public class UserStore: ObservableObject {
             email: "alex@xchange.app",
             bio: "Photographer and drone flyer. Always looking for prime lenses and studio gear.",
             avatar: "camera.circle.fill",
-            location: "Oakland, CA",
+            location: "Colombo 03, Sri Lanka",
+            phoneNumber: "+94 77 234 5678",
             rating: 4.88,
             tradesCompleted: 24,
             memberSince: "Oct 2023",
@@ -184,7 +244,8 @@ public class UserStore: ObservableObject {
             email: "sophia@xchange.app",
             bio: "Retro gamer & analog synthesizer collector. Willing to trade rare cartridges & eurorack modules!",
             avatar: "gamecontroller.circle.fill",
-            location: "San Jose, CA",
+            location: "Kandy, Sri Lanka",
+            phoneNumber: "+94 71 345 6789",
             rating: 5.0,
             tradesCompleted: 31,
             memberSince: "Aug 2023",
@@ -198,7 +259,8 @@ public class UserStore: ObservableObject {
             email: "marcus@xchange.app",
             bio: "Outdoor & hiking gear lover. Looking for lightweight tents, GPS watches, and trail bikes.",
             avatar: "figure.hiking.circle.fill",
-            location: "Berkeley, CA",
+            location: "Galle Fort, Sri Lanka",
+            phoneNumber: "+94 75 456 7890",
             rating: 4.79,
             tradesCompleted: 12,
             memberSince: "Feb 2024",
@@ -212,7 +274,8 @@ public class UserStore: ObservableObject {
             email: "elena@xchange.app",
             bio: "Audiophile and vintage sound technician. Restoring Japanese turntables and tube amps.",
             avatar: "music.note.tv.fill",
-            location: "San Francisco, CA",
+            location: "Negombo, Sri Lanka",
+            phoneNumber: "+94 78 567 8901",
             rating: 4.92,
             tradesCompleted: 40,
             memberSince: "Nov 2022",

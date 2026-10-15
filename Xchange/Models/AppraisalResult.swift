@@ -1,4 +1,4 @@
-﻿//
+//
 //  AppraisalResult.swift
 //  Xchange
 //
@@ -56,6 +56,6 @@ public struct AppraisalResult: Identifiable, Codable, Hashable {
     }
     
     public var formattedValueRange: String {
-        "$\(Int(valueRangeMin)) – $\(Int(valueRangeMax))"
+        "LKR \(Int(valueRangeMin)) – LKR \(Int(valueRangeMax))"
     }
 }

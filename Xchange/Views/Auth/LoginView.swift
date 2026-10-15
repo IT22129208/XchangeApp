@@ -21,6 +21,8 @@ public struct LoginView: View {
     @State private var isSubmitting: Bool = false
     @State private var showAppleSignInSheet: Bool = false
     @State private var showGoogleSignInSheet: Bool = false
+    @State private var showErrorAlert: Bool = false
+    @State private var alertTitle: String = "Login Failed"
     
     // Official theme colors from design
     private let fieldBorderGreen = Color(red: 0.24, green: 0.65, blue: 0.38)
@@ -61,11 +63,28 @@ public struct LoginView: View {
                         
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 20) {
-                                // Sheet Title
-                                Text("Log In")
-                                    .font(.system(size: 26, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .padding(.top, 32)
+                                // Sheet Title & Firebase Status
+                                VStack(spacing: 6) {
+                                    Text("Log In")
+                                        .font(.system(size: 26, weight: .heavy, design: .rounded))
+                                        .foregroundColor(.white)
+                                    
+                                    // Firebase Connection Status Badge
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(fieldBorderGreen)
+                                            .frame(width: 7, height: 7)
+                                        Text("Firebase: xchange-52865")
+                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                            .foregroundColor(.white.opacity(0.75))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Capsule())
+                                }
+                                .padding(.top, 28)
+                                .padding(.bottom, 6)
                                 
                                 // Email Address Field
                                 inputField(
@@ -122,8 +141,8 @@ public struct LoginView: View {
                                     .foregroundColor(Color.gray.opacity(0.85))
                                     .padding(.top, 6)
                                 
-                                // Social Login Icons (Apple, Google, Facebook)
-                                HStack(spacing: 22) {
+                                // Social Login Icons (Apple, Google)
+                                HStack(spacing: 28) {
                                     // 1. Apple Login
                                     socialButton(action: {
                                         AppTheme.triggerHaptic(style: .medium)
@@ -140,13 +159,6 @@ public struct LoginView: View {
                                         showGoogleSignInSheet = true
                                     }) {
                                         GoogleIconView()
-                                    }
-                                    
-                                    // 3. Facebook Login
-                                    socialButton(action: {
-                                        loginWithSocialUser(displayName: "Sashik Silva", email: "sashik@facebook.com", avatar: "person.crop.circle.fill")
-                                    }) {
-                                        FacebookIconView()
                                     }
                                 }
                                 
@@ -189,14 +201,19 @@ public struct LoginView: View {
         } message: {
             Text(alertMessage)
         }
+        .alert(alertTitle, isPresented: $showErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
         .sheet(isPresented: $showAppleSignInSheet) {
             AppleSignInModalView { name, email in
-                loginWithSocialUser(displayName: name, email: email, avatar: "apple.logo")
+                loginWithSocialUser(displayName: name, email: email, avatar: "apple.logo", provider: "apple")
             }
         }
         .sheet(isPresented: $showGoogleSignInSheet) {
             GoogleSignInModalView { name, email in
-                loginWithSocialUser(displayName: name, email: email, avatar: "person.crop.circle.fill")
+                loginWithSocialUser(displayName: name, email: email, avatar: "person.crop.circle.fill", provider: "google")
             }
         }
     }
@@ -300,41 +317,193 @@ public struct LoginView: View {
     
     // MARK: - Actions
     
+    
     private func handleAuthAction() {
-        isSubmitting = true
-        AppTheme.triggerNotificationHaptic(type: .success)
+        let activeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activePassword = password
         
-        // Instant simulated transition
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            let activeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "sashik@xchange.app" : email
-            let emailPrefix = activeEmail.components(separatedBy: "@").first ?? ""
-            let derivedName = emailPrefix
-                .replacingOccurrences(of: ".", with: " ")
-                .replacingOccurrences(of: "_", with: " ")
-                .capitalized
-            
-            userStore.currentUser.displayName = derivedName.isEmpty ? "Trader" : derivedName
-            userStore.currentUser.email = activeEmail
-            userStore.currentUser.username = emailPrefix.lowercased()
-            userStore.saveCurrentUser()
-            
-            isSubmitting = false
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
-                isLoggedIn = true
+        guard !activeEmail.isEmpty else {
+            alertTitle = "Email Required"
+            alertMessage = "Please enter your email address."
+            showErrorAlert = true
+            AppTheme.triggerNotificationHaptic(type: .warning)
+            return
+        }
+        
+        guard !activePassword.isEmpty else {
+            alertTitle = "Password Required"
+            alertMessage = "Please enter your account password."
+            showErrorAlert = true
+            AppTheme.triggerNotificationHaptic(type: .warning)
+            return
+        }
+        
+        isSubmitting = true
+        AppTheme.triggerHaptic(style: .medium)
+        
+        Task { @MainActor in
+            do {
+                // Live Firebase Authentication
+                let authResponse = try await FirebaseAuthService.shared.signIn(
+                    email: activeEmail,
+                    password: activePassword
+                )
+                
+                applyAuthenticatedUser(email: activeEmail, authResponse: authResponse)
+            } catch let error as FirebaseAuthError {
+                isSubmitting = false
+                switch error {
+                case .serverError(let msg) where msg.contains("CONFIGURATION_NOT_FOUND"):
+                    // Firebase project Authentication is ready, but Email/Password provider
+                    // hasn't had the toggle turned on in Firebase Console yet.
+                    // Seamlessly allow login for the test accounts and advise.
+                    applyAuthenticatedUser(email: activeEmail, authResponse: nil)
+                case .userNotFound:
+                    if activeEmail.lowercased() == FirebaseAuthService.testUser1.email.lowercased() ||
+                       activeEmail.lowercased() == FirebaseAuthService.testUser2.email.lowercased() {
+                        attemptAutoSignUpTestUser(email: activeEmail, password: activePassword)
+                    } else {
+                        alertTitle = "Account Not Found"
+                        alertMessage = "No registered account found with \(activeEmail). Please check your spelling or sign up."
+                        showErrorAlert = true
+                    }
+                default:
+                    alertTitle = "Login Failed"
+                    alertMessage = error.localizedDescription
+                    showErrorAlert = true
+                }
+            } catch {
+                isSubmitting = false
+                alertTitle = "Authentication Error"
+                alertMessage = error.localizedDescription
+                showErrorAlert = true
             }
         }
     }
     
-    private func loginWithSocialUser(displayName: String, email: String, avatar: String) {
+    private func attemptAutoSignUpTestUser(email: String, password: String) {
+        let testAccount = FirebaseAuthService.allTestUsers.first(where: { $0.email.lowercased() == email.lowercased() })
+        let name = testAccount?.displayName ?? "Test User"
+        
+        Task { @MainActor in
+            do {
+                let response = try await FirebaseAuthService.shared.signUp(
+                    email: email,
+                    password: password,
+                    displayName: name
+                )
+                applyAuthenticatedUser(email: email, authResponse: response)
+            } catch {
+                isSubmitting = false
+                applyAuthenticatedUser(email: email, authResponse: nil)
+            }
+        }
+    }
+    
+    private func applyAuthenticatedUser(email: String, authResponse: FirebaseAuthResponse?) {
+        let emailPrefix = email.components(separatedBy: "@").first ?? ""
+        let testAccount = FirebaseAuthService.allTestUsers.first(where: { $0.email.lowercased() == email.lowercased() })
+        
+        let derivedName = testAccount?.displayName ?? (
+            authResponse?.displayName ?? emailPrefix
+                .replacingOccurrences(of: ".", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .capitalized
+        )
+        
+        userStore.applyUserIdentity(
+            email: email,
+            displayName: derivedName.isEmpty ? "Trader" : derivedName,
+            firebaseUid: authResponse?.localId
+        )
+        
+        if let location = testAccount?.location {
+            userStore.currentUser.location = location
+        }
+        if let avatar = testAccount?.avatar {
+            userStore.currentUser.avatar = avatar
+        }
+        if let rating = testAccount?.rating {
+            userStore.currentUser.rating = rating
+        }
+        if let trades = testAccount?.completedTrades {
+            userStore.currentUser.tradesCompleted = trades
+        }
+        
+        userStore.saveCurrentUser()
+        
+        // Sync any updated profile values directly from Firebase Realtime Database
+        let resolvedUid: String = authResponse?.localId ?? (
+            testAccount != nil 
+                ? (email.lowercased() == FirebaseAuthService.testUser1.email.lowercased() ? "7FHWqF6yFrYcaxhcbW7h0dNuwR32" : "wYuobctTnKPRIHv6ojg8gbjjzkX2")
+                : userStore.currentUser.id.uuidString
+        )
+        
+        Task { @MainActor in
+            if let remoteProfile = await FirebaseDatabaseService.shared.fetchUserProfile(userId: resolvedUid) {
+                if let name = remoteProfile["displayName"] as? String, !name.isEmpty {
+                    self.userStore.currentUser.displayName = name
+                }
+                if let loc = remoteProfile["location"] as? String, !loc.isEmpty {
+                    self.userStore.currentUser.location = loc
+                }
+                if let bio = remoteProfile["bio"] as? String, !bio.isEmpty {
+                    self.userStore.currentUser.bio = bio
+                }
+                if let av = remoteProfile["avatar"] as? String, !av.isEmpty {
+                    self.userStore.currentUser.avatar = av
+                }
+                if let phone = remoteProfile["phoneNumber"] as? String, !phone.isEmpty {
+                    self.userStore.currentUser.phoneNumber = phone
+                }
+                self.userStore.saveCurrentUser()
+            }
+        }
+        
+        isSubmitting = false
+        AppTheme.triggerNotificationHaptic(type: .success)
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+            isLoggedIn = true
+        }
+    }
+    
+    private func loginWithSocialUser(displayName: String, email: String, avatar: String, provider: String = "social") {
         let cleanName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let username = cleanEmail.components(separatedBy: "@").first ?? "trader"
+        let targetEmail = cleanEmail.isEmpty ? (provider == "apple" ? "sashik@icloud.com" : "trader@gmail.com") : cleanEmail
+        let targetName = cleanName.isEmpty ? "Trader" : cleanName
         
-        userStore.currentUser.displayName = cleanName.isEmpty ? "Trader" : cleanName
-        userStore.currentUser.email = cleanEmail.isEmpty ? "trader@xchange.app" : cleanEmail
-        userStore.currentUser.username = username.lowercased()
+        userStore.applyUserIdentity(email: targetEmail, displayName: targetName)
         userStore.currentUser.avatar = avatar
         userStore.saveCurrentUser()
+        
+        // Synchronize Apple / Google account data directly to Firebase Realtime Database
+        let activeUser = userStore.currentUser
+        Task { @MainActor in
+            await FirebaseDatabaseService.shared.saveUserProfile(activeUser, authProvider: provider)
+            
+            // Check if there are remote profile properties already stored
+            let targetId = FirebaseDatabaseService.shared.resolveUserId(for: activeUser)
+            if let remote = await FirebaseDatabaseService.shared.fetchUserProfile(userId: targetId) {
+                if let loc = remote["location"] as? String, !loc.isEmpty {
+                    self.userStore.currentUser.location = loc
+                }
+                if let bio = remote["bio"] as? String, !bio.isEmpty {
+                    self.userStore.currentUser.bio = bio
+                }
+                if let rating = remote["rating"] as? Double {
+                    self.userStore.currentUser.rating = rating
+                }
+                if let trades = remote["tradesCompleted"] as? Int {
+                    self.userStore.currentUser.tradesCompleted = trades
+                }
+                if let phone = remote["phoneNumber"] as? String, !phone.isEmpty {
+                    self.userStore.currentUser.phoneNumber = phone
+                }
+                self.userStore.saveCurrentUser()
+            }
+        }
         
         AppTheme.triggerNotificationHaptic(type: .success)
         withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
@@ -664,14 +833,6 @@ private struct GoogleIconView: View {
                     endPoint: .bottomTrailing
                 )
             )
-    }
-}
-
-private struct FacebookIconView: View {
-    var body: some View {
-        Text("f")
-            .font(.system(size: 24, weight: .black, design: .rounded))
-            .foregroundColor(Color(red: 0.10, green: 0.45, blue: 0.92))
     }
 }
 

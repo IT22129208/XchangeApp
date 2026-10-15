@@ -18,7 +18,7 @@ public struct TradeChatView: View {
     @State private var showCounterSheet = false
     
     private var isIncoming: Bool {
-        proposal.receiverId == userStore.currentUser.id
+        proposal.isIncoming(for: userStore.currentUser)
     }
     
     private var partnerName: String {

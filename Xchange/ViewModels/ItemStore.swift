@@ -16,7 +16,7 @@ public class ItemStore: ObservableObject {
     @Published public var selectedCategory: ItemCategory = .all
     @Published public var searchQuery: String = ""
     @Published public var selectedConditionFilter: ItemCondition? = nil
-    @Published public var maxPriceFilter: Double = 2000
+    @Published public var maxPriceFilter: Double = 500000
     @Published public var sortBy: ItemSortOption = .newest
     
     private let persistence = PersistenceService.shared
@@ -32,18 +32,63 @@ public class ItemStore: ObservableObject {
     
     public init() {
         loadItems()
+        fetchRemoteItems()
     }
     
-    // MARK: - Persistence Integration
+    // MARK: - Persistence & Cloud Sync
+    
+    public func fetchRemoteItems() {
+        Task { @MainActor in
+            let remote = await FirebaseDatabaseService.shared.fetchItems()
+            if !remote.isEmpty {
+                for remoteItem in remote {
+                    if let index = self.items.firstIndex(where: { $0.id == remoteItem.id }) {
+                        self.items[index] = remoteItem
+                    } else {
+                        self.items.insert(remoteItem, at: 0)
+                    }
+                }
+                self.saveItems()
+            }
+        }
+    }
     
     private func saveItems() {
         persistence.save(items, to: PersistenceService.FileKey.items)
     }
     
     private func loadItems() {
-        if let stored: [Item] = persistence.load([Item].self, from: PersistenceService.FileKey.items),
+        if var stored: [Item] = persistence.load([Item].self, from: PersistenceService.FileKey.items),
            !stored.isEmpty,
-           stored.contains(where: { $0.images.contains("item_road_bike") }) {
+           stored.contains(where: { $0.ownerLocation.contains("Sri Lanka") && $0.estimatedValue >= 1000 }) {
+            var updated = false
+            for i in 0..<stored.count {
+                if stored[i].ownerName.lowercased().contains("kasun") {
+                    if stored[i].ownerId != UserStore.testUser1Id || stored[i].ownerEmail.isEmpty {
+                        stored[i].ownerId = UserStore.testUser1Id
+                        stored[i].ownerEmail = "testuser1@xchange.lk"
+                        updated = true
+                    }
+                } else if stored[i].ownerName.lowercased().contains("dilini") {
+                    if stored[i].ownerId != UserStore.testUser2Id || stored[i].ownerEmail.isEmpty {
+                        stored[i].ownerId = UserStore.testUser2Id
+                        stored[i].ownerEmail = "testuser2@xchange.lk"
+                        updated = true
+                    }
+                }
+            }
+            
+            let hasKasun = stored.contains(where: { $0.ownerName.lowercased().contains("kasun") })
+            let hasDilini = stored.contains(where: { $0.ownerName.lowercased().contains("dilini") })
+            if !hasKasun || !hasDilini {
+                seedSampleData()
+                saveItems()
+                return
+            }
+            
+            if updated {
+                persistence.save(stored, to: PersistenceService.FileKey.items)
+            }
             self.items = stored
         } else {
             seedSampleData()
@@ -87,11 +132,19 @@ public class ItemStore: ObservableObject {
     }
     
     // Items owned by the active user
+    public func userItems(for user: User) -> [Item] {
+        return items.filter { $0.isOwnedBy(user: user) }
+    }
+    
     public func userItems(for userId: UUID) -> [Item] {
         return items.filter { $0.ownerId == userId }
     }
     
     // Current user's available items that can be offered in a trade
+    public func availableItemsToOffer(for user: User) -> [Item] {
+        return items.filter { $0.isOwnedBy(user: user) && $0.status == .available }
+    }
+    
     public func availableItemsToOffer(for userId: UUID) -> [Item] {
         return items.filter { $0.ownerId == userId && $0.status == .available }
     }
@@ -141,29 +194,74 @@ public class ItemStore: ObservableObject {
     // MARK: - Sample Seed Data
     private func seedSampleData() {
         let currentUserId = UserStore.currentUserId
+        let testUser1Id = UserStore.testUser1Id
+        let testUser2Id = UserStore.testUser2Id
         let alexId = UserStore.alexUserId
         let sophiaId = UserStore.sophiaUserId
         let marcusId = UserStore.marcusUserId
         let elenaId = UserStore.elenaUserId
         
         let sampleItems: [Item] = [
+            // Test User 1 (Kasun Perera) active listing
+            Item(
+                id: UUID(uuidString: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d")!,
+                title: "Sony WH-1000XM5 Wireless Headphones",
+                description: "Mint condition with original carrying case, auxiliary cable and USB-C cord. Premium active noise cancellation, used for 2 months.",
+                category: .electronics,
+                condition: .likeNew,
+                estimatedValue: 85000,
+                preferredTrades: "Looking for iPad Mini 6 or Fujifilm X-mount prime lens.",
+                images: ["headphones"],
+                ownerId: testUser1Id,
+                ownerName: "Kasun Perera",
+                ownerEmail: "testuser1@xchange.lk",
+                ownerAvatar: "person.crop.circle.fill",
+                ownerRating: 4.9,
+                ownerLocation: "Malabe, Colombo, Sri Lanka",
+                status: .available,
+                tags: ["Electronics", "Audio", "Sony", "ANC"],
+                createdAt: Calendar.current.date(byAdding: .minute, value: -1, to: Date()) ?? Date()
+            ),
+            
+            // Test User 2 (Dilini Fernando) active listing
+            Item(
+                id: UUID(uuidString: "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e")!,
+                title: "Vintage Olympus OM-1 35mm SLR Camera",
+                description: "Clean mechanical body with Zuiko 50mm f/1.8 lens. Working light meter, new light seals installed. Perfect for analog film photography enthusiasts.",
+                category: .collectibles,
+                condition: .gentlyUsed,
+                estimatedValue: 55000,
+                preferredTrades: "Mirrorless body or Sony E-mount optics.",
+                images: ["camera.viewfinder"],
+                ownerId: testUser2Id,
+                ownerName: "Dilini Fernando",
+                ownerEmail: "testuser2@xchange.lk",
+                ownerAvatar: "person.crop.circle.fill.badge.checkmark",
+                ownerRating: 5.0,
+                ownerLocation: "Kandy City, Sri Lanka",
+                status: .available,
+                tags: ["Collectibles", "Photography", "Vintage", "Olympus"],
+                createdAt: Calendar.current.date(byAdding: .minute, value: -2, to: Date()) ?? Date()
+            ),
+            
             // 1. Road Bike (matches screenshot Row 1 Left)
             Item(
                 title: "Road Bike",
                 description: "Vintage restored light-blue road bicycle with lightweight steel frame, polished drop bars, and leather saddle. Smooth gearing and tuned brakes.",
                 category: .vehicles,
                 condition: .gentlyUsed,
-                estimatedValue: 520,
+                estimatedValue: 75000,
                 preferredTrades: "Looking for camera lenses, synthesizers, or high-end mechanical keyboards.",
                 images: ["item_road_bike"],
                 ownerId: alexId,
                 ownerName: "Alex Rivera",
+                ownerEmail: "alex@xchange.lk",
                 ownerAvatar: "bicycle.circle.fill",
                 ownerRating: 4.95,
-                ownerLocation: "Oakland, CA",
+                ownerLocation: "Colombo 03, Sri Lanka",
                 status: .available,
                 tags: ["Bike", "RoadBike", "Vintage", "Vehicles"],
-                createdAt: Calendar.current.date(byAdding: .minute, value: -1, to: Date()) ?? Date()
+                createdAt: Calendar.current.date(byAdding: .minute, value: -3, to: Date()) ?? Date()
             ),
             
             // 2. Smartphone (matches screenshot Row 1 Right)
@@ -172,14 +270,14 @@ public class ItemStore: ObservableObject {
                 description: "Flagship 5G smartphone with OLED edge-to-edge display, dual cameras, 256GB storage, and all-day battery life. Flawless condition with screen protector.",
                 category: .electronics,
                 condition: .likeNew,
-                estimatedValue: 699,
+                estimatedValue: 145000,
                 preferredTrades: "Trade for MacBook Air M1/M2, Sony mirrorless camera, or iPad Air.",
                 images: ["item_smartphone"],
                 ownerId: sophiaId,
                 ownerName: "Sophia Chen",
                 ownerAvatar: "phone.circle.fill",
                 ownerRating: 4.92,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Kandy, Sri Lanka",
                 status: .available,
                 tags: ["Smartphone", "Phone", "Electronics", "5G"],
                 createdAt: Calendar.current.date(byAdding: .minute, value: -2, to: Date()) ?? Date()
@@ -191,14 +289,14 @@ public class ItemStore: ObservableObject {
                 description: "Curated collection of classic 33 RPM LP vinyl records including vintage soul, jazz, and rock pressings in mint and excellent condition.",
                 category: .booksMedia,
                 condition: .vintageSalvage,
-                estimatedValue: 240,
+                estimatedValue: 35000,
                 preferredTrades: "Looking for vintage turntable cartridge, audio monitors, or guitar pedals.",
                 images: ["item_vinyl_collection"],
                 ownerId: elenaId,
                 ownerName: "Elena Rostova",
                 ownerAvatar: "music.note.tv.fill",
                 ownerRating: 4.94,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Galle Fort, Sri Lanka",
                 status: .available,
                 tags: ["Vinyl", "Records", "Music", "Collectibles"],
                 createdAt: Calendar.current.date(byAdding: .minute, value: -3, to: Date()) ?? Date()
@@ -210,14 +308,14 @@ public class ItemStore: ObservableObject {
                 description: "Handcrafted dreadnought acoustic guitar with solid spruce top, mahogany back and sides. Warm balanced tone with low action and padded gig bag.",
                 category: .musicalInstruments,
                 condition: .likeNew,
-                estimatedValue: 480,
+                estimatedValue: 68000,
                 preferredTrades: "Trade for electric guitar, tube amp, audio interface, or condenser microphone.",
                 images: ["item_acoustic_guitar"],
                 ownerId: marcusId,
                 ownerName: "Marcus Vance",
                 ownerAvatar: "guitars.circle.fill",
                 ownerRating: 4.88,
-                ownerLocation: "Berkeley, CA",
+                ownerLocation: "Negombo, Sri Lanka",
                 status: .available,
                 tags: ["Guitar", "Acoustic", "Music", "Instruments"],
                 createdAt: Calendar.current.date(byAdding: .minute, value: -4, to: Date()) ?? Date()
@@ -229,14 +327,14 @@ public class ItemStore: ObservableObject {
                 description: "Original vintage Polaroid instant film camera. Fully serviced rollers, clean viewfinder, and sharp instant prints. Includes genuine strap.",
                 category: .cameras,
                 condition: .vintageSalvage,
-                estimatedValue: 180,
+                estimatedValue: 28000,
                 preferredTrades: "Looking for 35mm film rolls, vintage analog lenses, or retro games.",
                 images: ["item_polaroid_camera"],
                 ownerId: sophiaId,
                 ownerName: "Sophia Chen",
                 ownerAvatar: "camera.circle.fill",
                 ownerRating: 4.92,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Malabe, Sri Lanka",
                 status: .available,
                 tags: ["Polaroid", "Camera", "Vintage", "Photography"],
                 createdAt: Calendar.current.date(byAdding: .minute, value: -5, to: Date()) ?? Date()
@@ -248,14 +346,14 @@ public class ItemStore: ObservableObject {
                 description: "19th century antique world parchment map with brass desktop globe. Detailed illustrations and gilded cartography in excellent archival state.",
                 category: .collectibles,
                 condition: .vintageSalvage,
-                estimatedValue: 350,
+                estimatedValue: 42000,
                 preferredTrades: "Trade for rare first edition books, vintage compass, or brass telescopes.",
                 images: ["item_antique_map"],
                 ownerId: marcusId,
                 ownerName: "Marcus Vance",
                 ownerAvatar: "book.circle.fill",
                 ownerRating: 4.88,
-                ownerLocation: "Berkeley, CA",
+                ownerLocation: "Colombo 07, Sri Lanka",
                 status: .available,
                 tags: ["Antique", "Map", "Globe", "Collectibles", "Vintage"],
                 createdAt: Calendar.current.date(byAdding: .minute, value: -6, to: Date()) ?? Date()
@@ -267,33 +365,34 @@ public class ItemStore: ObservableObject {
                 description: "Professional 2-hour portrait or product photography session with 15 retouched high-res deliverables and studio lighting.",
                 category: .services,
                 condition: .brandNew,
-                estimatedValue: 250,
+                estimatedValue: 35000,
                 preferredTrades: "Looking for graphic design branding, video editing, or audio mixing.",
                 images: ["camera.fill"],
                 ownerId: sophiaId,
                 ownerName: "Sophia Chen",
                 ownerAvatar: "camera.circle.fill",
                 ownerRating: 4.98,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Colombo 04, Sri Lanka",
                 status: .available,
                 tags: ["Services", "Photography", "Studio", "Creative"],
                 createdAt: Calendar.current.date(byAdding: .minute, value: -7, to: Date()) ?? Date()
             ),
             
-            // Current User's active listings
+            // Seed Listings
             Item(
                 title: "MacBook Pro",
                 description: "Apple MacBook Pro 14-inch (M3 Pro chip, 18GB unified memory, 512GB SSD). Space Black, battery health 100%. Includes 70W MagSafe charger and original packaging.",
                 category: .electronics,
                 condition: .likeNew,
-                estimatedValue: 1650,
+                estimatedValue: 320000,
                 preferredTrades: "Looking for Sony FX3 / A7S III or Leica Q2, or Gibson Les Paul Standard.",
                 images: ["laptopcomputer"],
                 ownerId: currentUserId,
-                ownerName: "Alex Rivera",
+                ownerName: "Sashik Silva",
+                ownerEmail: "sashik@xchange.lk",
                 ownerAvatar: "person.crop.circle.fill",
                 ownerRating: 4.95,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Malabe, Colombo, Sri Lanka",
                 status: .available,
                 tags: ["Apple", "MacBook", "M3", "Laptop", "Creative"],
                 createdAt: Calendar.current.date(byAdding: .hour, value: -1, to: Date()) ?? Date()
@@ -303,33 +402,34 @@ public class ItemStore: ObservableObject {
                 description: "Wacom Intuos Pro Medium Graphic Tablet with Pro Pen 2. Barely used, pristine drawing surface with 8192 levels of pressure sensitivity. USB-C and Bluetooth.",
                 category: .electronics,
                 condition: .likeNew,
-                estimatedValue: 280,
+                estimatedValue: 55000,
                 preferredTrades: "Trade for iPad 10th Gen or AirPods Max or mechanical keyboard.",
                 images: ["ipad.and.iphone"],
                 ownerId: currentUserId,
-                ownerName: "Alex Rivera",
+                ownerName: "Sashik Silva",
+                ownerEmail: "sashik@xchange.lk",
                 ownerAvatar: "person.crop.circle.fill",
                 ownerRating: 4.95,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Malabe, Colombo, Sri Lanka",
                 status: .available,
                 tags: ["Wacom", "Drawing", "Design", "DigitalArt"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
             ),
             
-            // Community Featured Listings matching design
+            // Community Listings matching design
             Item(
                 title: "Vintage Bike",
                 description: "Restored French 10-speed Vintage Road Bicycle with classic steel lugged frame, Brooks England B17 honey leather saddle, polished drop bars, and gumwall tires.",
                 category: .vehicles,
                 condition: .gentlyUsed,
-                estimatedValue: 520,
+                estimatedValue: 75000,
                 preferredTrades: "Looking for mirrorless camera body, synth gear, or DJ controllers.",
                 images: ["bicycle"],
                 ownerId: alexId,
                 ownerName: "Alex Rivera",
                 ownerAvatar: "bicycle.circle.fill",
                 ownerRating: 4.94,
-                ownerLocation: "Oakland, CA",
+                ownerLocation: "Kurunegala, Sri Lanka",
                 status: .available,
                 tags: ["Bicycle", "Vintage", "SteelFrame", "Commuter"],
                 createdAt: Calendar.current.date(byAdding: .hour, value: -4, to: Date()) ?? Date()
@@ -339,14 +439,14 @@ public class ItemStore: ObservableObject {
                 description: "Canon EOS 90D DSLR Camera with EF-S 18-135mm f/3.5-5.6 IS USM Lens. 32.5 MP APS-C sensor, 4K video, dual batteries, 128GB SanDisk Extreme card.",
                 category: .cameras,
                 condition: .likeNew,
-                estimatedValue: 980,
+                estimatedValue: 165000,
                 preferredTrades: "Looking for Sony A7 III or Fujifilm X100V.",
                 images: ["camera.fill"],
                 ownerId: sophiaId,
                 ownerName: "Sophia Chen",
                 ownerAvatar: "camera.circle.fill",
                 ownerRating: 4.92,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Matara, Sri Lanka",
                 status: .available,
                 tags: ["Canon", "DSLR", "Photography", "Camera", "Lens"],
                 createdAt: Calendar.current.date(byAdding: .hour, value: -6, to: Date()) ?? Date()
@@ -356,14 +456,14 @@ public class ItemStore: ObservableObject {
                 description: "1894 Antique Illustrated Edition of Jules Verne's 'Twenty Thousand Leagues Under the Sea'. Gilded leather-bound spine, marbled endpapers, pristine woodcut plates.",
                 category: .collectibles,
                 condition: .vintageSalvage,
-                estimatedValue: 650,
+                estimatedValue: 45000,
                 preferredTrades: "Looking for vintage watches (Seiko mechanical / Omega) or first edition literature.",
                 images: ["books.vertical.fill"],
                 ownerId: marcusId,
                 ownerName: "Marcus Vance",
                 ownerAvatar: "book.circle.fill",
                 ownerRating: 4.88,
-                ownerLocation: "Berkeley, CA",
+                ownerLocation: "Gampaha, Sri Lanka",
                 status: .available,
                 tags: ["Antique", "RareBook", "Collectibles", "FirstEdition", "JulesVerne"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
@@ -373,14 +473,14 @@ public class ItemStore: ObservableObject {
                 description: "Includes XC 15-45mm lens, 2 original Fuji batteries, dual bay charger, Peak Design strap lugs, and original box. Sensor is pristine.",
                 category: .cameras,
                 condition: .likeNew,
-                estimatedValue: 790,
+                estimatedValue: 185000,
                 preferredTrades: "Will trade for DJI Mini 4 Pro Fly More, or Sony FE 24-70mm f/2.8 GM lens, or M2 Mac Mini.",
                 images: ["camera_fuji"],
                 ownerId: alexId,
                 ownerName: "Alex Rivera",
                 ownerAvatar: "camera.circle.fill",
                 ownerRating: 4.88,
-                ownerLocation: "Oakland, CA",
+                ownerLocation: "Colombo 05, Sri Lanka",
                 status: .available,
                 tags: ["Fujifilm", "Camera", "Mirrorless", "Photography"],
                 createdAt: Calendar.current.date(byAdding: .hour, value: -5, to: Date()) ?? Date()
@@ -390,14 +490,14 @@ public class ItemStore: ObservableObject {
                 description: "FPGA handheld that plays original Game Boy, GBC, and GBA cartridges. Comes with hard plastic cover, dock, and 128GB MicroSD.",
                 category: .gaming,
                 condition: .brandNew,
-                estimatedValue: 310,
+                estimatedValue: 62000,
                 preferredTrades: "Trade for teenage engineering OP-Z synthesizer or Fender electric guitar neck/body.",
                 images: ["console_pocket"],
                 ownerId: sophiaId,
                 ownerName: "Sophia Chen",
                 ownerAvatar: "gamecontroller.circle.fill",
                 ownerRating: 5.0,
-                ownerLocation: "San Jose, CA",
+                ownerLocation: "Dehiwala, Sri Lanka",
                 status: .available,
                 tags: ["Retro", "Analogue", "GameBoy", "Gaming", "FPGA"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
@@ -407,14 +507,14 @@ public class ItemStore: ObservableObject {
                 description: "Portable synthesizer, sampler and 4-track tape recorder. Aluminum chassis, stereo signal chain, Bluetooth MIDI. Mint with case.",
                 category: .musicalInstruments,
                 condition: .likeNew,
-                estimatedValue: 1450,
+                estimatedValue: 290000,
                 preferredTrades: "Looking for Roland SP-404MKII + Cash or Sequential Prophet 6 / Elektron Syntakt bundle.",
                 images: ["synth_op1"],
                 ownerId: elenaId,
                 ownerName: "Elena Rostova",
                 ownerAvatar: "music.note.tv.fill",
                 ownerRating: 4.92,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Rajagiriya, Sri Lanka",
                 status: .available,
                 tags: ["Synthesizer", "TeenageEngineering", "Music", "Sampler", "Studio"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
@@ -424,14 +524,14 @@ public class ItemStore: ObservableObject {
                 description: "The ultimate beatmaker sampler. Updated to latest 4.0 firmware with preloaded vinyl drum kits. Includes power supply and 64GB high speed SD card.",
                 category: .musicalInstruments,
                 condition: .gentlyUsed,
-                estimatedValue: 460,
+                estimatedValue: 95000,
                 preferredTrades: "Looking for MPC One+ or Gibson Epiphone Les Paul or Sony RX100 VII.",
                 images: ["sampler_sp404"],
                 ownerId: marcusId,
                 ownerName: "Marcus Vance",
                 ownerAvatar: "figure.hiking.circle.fill",
                 ownerRating: 4.79,
-                ownerLocation: "Berkeley, CA",
+                ownerLocation: "Battaramulla, Sri Lanka",
                 status: .available,
                 tags: ["Roland", "Sampler", "Beatmaker", "LoFi", "HipHop"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? Date()
@@ -441,14 +541,14 @@ public class ItemStore: ObservableObject {
                 description: "Restored vintage Japanese turntable with walnut veneer finish. Fitted with brand new Audio-Technica VM95E cartridge. Sounds warm and deep.",
                 category: .booksMedia,
                 condition: .vintageSalvage,
-                estimatedValue: 320,
+                estimatedValue: 58000,
                 preferredTrades: "Looking for vintage analog tube amplifiers, Bose 901 speakers, or rare jazz LP collections.",
                 images: ["turntable_pioneer"],
                 ownerId: elenaId,
                 ownerName: "Elena Rostova",
                 ownerAvatar: "music.note.tv.fill",
                 ownerRating: 4.92,
-                ownerLocation: "San Francisco, CA",
+                ownerLocation: "Mount Lavinia, Sri Lanka",
                 status: .available,
                 tags: ["Vintage", "Vinyl", "Audiophile", "Turntable", "Pioneer"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -4, to: Date()) ?? Date()
@@ -458,14 +558,14 @@ public class ItemStore: ObservableObject {
                 description: "Laser illuminates invisible dust. Includes digital motorbar head, hair screw tool, combination tool, wall mount dock and two filters.",
                 category: .homeGarden,
                 condition: .gentlyUsed,
-                estimatedValue: 420,
+                estimatedValue: 88000,
                 preferredTrades: "Looking for espresso machine (Breville Barista Touch/Pro) or Dyson Airwrap.",
                 images: ["vacuum_dyson"],
                 ownerId: alexId,
                 ownerName: "Alex Rivera",
                 ownerAvatar: "camera.circle.fill",
                 ownerRating: 4.88,
-                ownerLocation: "Oakland, CA",
+                ownerLocation: "Nugegoda, Sri Lanka",
                 status: .available,
                 tags: ["Dyson", "Home", "Appliances", "Clean"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -5, to: Date()) ?? Date()
@@ -475,14 +575,14 @@ public class ItemStore: ObservableObject {
                 description: "Iconic carry-on compliant duffel/backpack. Smolder Blue colorway. High-durability 100% recycled ripstop fabric with TPU laminate.",
                 category: .fashion,
                 condition: .brandNew,
-                estimatedValue: 240,
+                estimatedValue: 38000,
                 preferredTrades: "Trade for Arc'teryx Atom LT Hoody (Men's M) or camping gear.",
                 images: ["backpack_patagonia"],
                 ownerId: marcusId,
                 ownerName: "Marcus Vance",
                 ownerAvatar: "figure.hiking.circle.fill",
                 ownerRating: 4.79,
-                ownerLocation: "Berkeley, CA",
+                ownerLocation: "Maharagama, Sri Lanka",
                 status: .available,
                 tags: ["Patagonia", "Backpack", "Travel", "Outdoor"],
                 createdAt: Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()

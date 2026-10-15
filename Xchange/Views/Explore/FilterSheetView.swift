@@ -1,4 +1,4 @@
-﻿//
+//
 //  FilterSheetView.swift
 //  Xchange
 //
@@ -61,12 +61,12 @@ public struct FilterSheetView: View {
                             Text("Up to")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text("$\(Int(tempMaxPrice))")
+                            Text("LKR \(Int(tempMaxPrice))")
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundColor(AppTheme.primary)
                         }
                         
-                        Slider(value: $tempMaxPrice, in: 50...2500, step: 25)
+                        Slider(value: $tempMaxPrice, in: 5000...500000, step: 5000)
                             .tint(AppTheme.primary)
                     }
                     .padding(.vertical, 4)
@@ -87,7 +87,7 @@ public struct FilterSheetView: View {
                     Button(role: .destructive) {
                         tempCategory = .all
                         tempCondition = nil
-                        tempMaxPrice = 2000
+                        tempMaxPrice = 500000
                         tempSort = .newest
                         AppTheme.triggerHaptic(style: .light)
                     } label: {

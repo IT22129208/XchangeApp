@@ -111,11 +111,13 @@ public struct Item: Identifiable, Codable, Hashable {
     public var description: String
     public var category: ItemCategory
     public var condition: ItemCondition
-    public var estimatedValue: Double // Reference fair market value (USD) to assist barter parity
-    public var preferredTrades: String // What the owner wants in exchange (e.g. "Vintage mechanical keyboard or audio gear")
+    public var estimatedValue: Double // Reference fair market value (LKR) to assist barter parity
+    public var preferredTrades: String // What the owner wants in exchange
     public var images: [String] // Asset names or remote URLs
     public var ownerId: UUID
     public var ownerName: String
+    public var ownerEmail: String
+    public var ownerPhone: String
     public var ownerAvatar: String
     public var ownerRating: Double
     public var ownerLocation: String
@@ -135,9 +137,11 @@ public struct Item: Identifiable, Codable, Hashable {
         images: [String],
         ownerId: UUID,
         ownerName: String,
+        ownerEmail: String = "",
+        ownerPhone: String = "",
         ownerAvatar: String = "person.crop.circle.fill",
         ownerRating: Double = 5.0,
-        ownerLocation: String = "San Francisco, CA",
+        ownerLocation: String = "Colombo, Sri Lanka",
         status: ItemStatus = .available,
         tags: [String] = [],
         createdAt: Date = Date(),
@@ -153,6 +157,8 @@ public struct Item: Identifiable, Codable, Hashable {
         self.images = images
         self.ownerId = ownerId
         self.ownerName = ownerName
+        self.ownerEmail = ownerEmail
+        self.ownerPhone = ownerPhone
         self.ownerAvatar = ownerAvatar
         self.ownerRating = ownerRating
         self.ownerLocation = ownerLocation
@@ -162,10 +168,58 @@ public struct Item: Identifiable, Codable, Hashable {
         self.isFavorite = isFavorite
     }
     
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, category, condition, estimatedValue, preferredTrades
+        case images, ownerId, ownerName, ownerEmail, ownerPhone, ownerAvatar, ownerRating, ownerLocation
+        case status, tags, createdAt, isFavorite
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decode(String.self, forKey: .description)
+        category = try container.decode(ItemCategory.self, forKey: .category)
+        condition = try container.decode(ItemCondition.self, forKey: .condition)
+        estimatedValue = try container.decode(Double.self, forKey: .estimatedValue)
+        preferredTrades = try container.decode(String.self, forKey: .preferredTrades)
+        images = try container.decode([String].self, forKey: .images)
+        ownerId = try container.decode(UUID.self, forKey: .ownerId)
+        ownerName = try container.decode(String.self, forKey: .ownerName)
+        ownerEmail = try container.decodeIfPresent(String.self, forKey: .ownerEmail) ?? ""
+        ownerPhone = try container.decodeIfPresent(String.self, forKey: .ownerPhone) ?? ""
+        ownerAvatar = try container.decodeIfPresent(String.self, forKey: .ownerAvatar) ?? "person.crop.circle.fill"
+        ownerRating = try container.decodeIfPresent(Double.self, forKey: .ownerRating) ?? 5.0
+        ownerLocation = try container.decodeIfPresent(String.self, forKey: .ownerLocation) ?? "Colombo, Sri Lanka"
+        status = try container.decodeIfPresent(ItemStatus.self, forKey: .status) ?? .available
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+    }
+    
+    /// Checks if this item belongs to the specified user
+    public func isOwnedBy(user: User) -> Bool {
+        if self.ownerId == user.id {
+            return true
+        }
+        if !self.ownerEmail.isEmpty && !user.email.isEmpty &&
+            self.ownerEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == user.email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            return true
+        }
+        if !self.ownerName.isEmpty && !user.displayName.isEmpty &&
+            self.ownerName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == user.displayName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            return true
+        }
+        return false
+    }
+    
     public var formattedValue: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "en_LK")
+        formatter.currencyCode = "LKR"
+        formatter.currencySymbol = "LKR "
         formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: estimatedValue)) ?? "$\(Int(estimatedValue))"
+        return formatter.string(from: NSNumber(value: estimatedValue)) ?? "LKR \(Int(estimatedValue))"
     }
 }

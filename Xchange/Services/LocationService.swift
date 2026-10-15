@@ -1,4 +1,4 @@
-﻿//
+//
 //  LocationService.swift
 //  Xchange
 //
@@ -21,8 +21,8 @@ public final class LocationService: NSObject, ObservableObject, CLLocationManage
     
     private let locationManager = CLLocationManager()
     
-    // Default fallback location: San Francisco Downtown / Tech Hub
-    public static let defaultCoordinate = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+    // Default fallback location: Colombo Downtown / Western Province, Sri Lanka
+    public static let defaultCoordinate = CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612)
     // SLIIT Malabe Campus coordinates for academic demo reference
     public static let sliitCampusCoordinate = CLLocationCoordinate2D(latitude: 6.9147, longitude: 79.9729)
     

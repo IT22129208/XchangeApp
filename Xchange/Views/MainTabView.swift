@@ -69,6 +69,16 @@ public struct MainTabView: View {
         .sheet(isPresented: $showAddItemSheet) {
             AddItemView(isPresentedAsModal: true)
         }
+        .task {
+            await tradeStore.fetchRemoteProposals()
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == .messages {
+                Task {
+                    await tradeStore.fetchRemoteProposals()
+                }
+            }
+        }
     }
     
     // MARK: - Custom Bottom Navigation Bar
@@ -137,10 +147,26 @@ public struct MainTabView: View {
             selectedTab = tab
         } label: {
             VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: isSelected ? .bold : .medium))
-                    .foregroundColor(isSelected ? activeGreen : inactiveGray)
-                    .frame(height: 24)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: isSelected ? .bold : .medium))
+                        .foregroundColor(isSelected ? activeGreen : inactiveGray)
+                        .frame(height: 24)
+                    
+                    if tab == .messages {
+                        let count = tradeStore.pendingCount(for: userStore.currentUser)
+                        if count > 0 {
+                            Text("\(count)")
+                                .font(.system(size: 9, weight: .heavy))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(activeGreen)
+                                .clipShape(Capsule())
+                                .offset(x: 10, y: -4)
+                        }
+                    }
+                }
                 
                 Text(label)
                     .font(.system(size: 11, weight: isSelected ? .bold : .medium))

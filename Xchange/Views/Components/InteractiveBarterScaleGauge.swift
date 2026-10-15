@@ -1,4 +1,4 @@
-﻿//
+//
 //  InteractiveBarterScaleGauge.swift
 //  Xchange
 //
@@ -155,7 +155,7 @@ public struct InteractiveBarterScaleGauge: View {
                     Circle()
                         .fill(AppTheme.primary)
                         .frame(width: 8, height: 8)
-                    Text("Your Items: $\(Int(offeredValue))")
+                    Text("Your Items: LKR \(Int(offeredValue))")
                         .font(.system(size: 12, weight: .semibold))
                 }
                 
@@ -173,7 +173,7 @@ public struct InteractiveBarterScaleGauge: View {
                     Circle()
                         .fill(AppTheme.tradeAccent)
                         .frame(width: 8, height: 8)
-                    Text("Partner Items: $\(Int(requestedValue))")
+                    Text("Partner Items: LKR \(Int(requestedValue))")
                         .font(.system(size: 12, weight: .semibold))
                 }
             }
@@ -198,9 +198,9 @@ public struct InteractiveBarterScaleGauge: View {
         if isBalanced {
             return "⚖️ Fair Trade Balance"
         } else if offeredValue > requestedValue {
-            return "+$\(Int(diff)) Favoring Partner"
+            return "+LKR \(Int(diff)) Favoring Partner"
         } else {
-            return "+$\(Int(diff)) In Your Favor"
+            return "+LKR \(Int(diff)) In Your Favor"
         }
     }
 }
@@ -230,7 +230,7 @@ private struct HangingPanView: View {
                             .stroke(color, lineWidth: 1.5)
                     )
                 
-                Text("$\(Int(value))")
+                Text("LKR \(Int(value))")
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundColor(color)
                     .offset(y: -1)

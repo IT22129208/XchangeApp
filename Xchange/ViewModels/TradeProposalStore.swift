@@ -1,4 +1,4 @@
-﻿//
+//
 //  TradeProposalStore.swift
 //  Xchange
 //
@@ -18,9 +18,12 @@ public class TradeProposalStore: ObservableObject {
     
     public init() {
         loadProposals()
+        Task {
+            await fetchRemoteProposals()
+        }
     }
     
-    // MARK: - Persistence Integration
+    // MARK: - Persistence & Firebase Integration
     
     private func saveProposals() {
         persistence.save(proposals, to: PersistenceService.FileKey.proposals)
@@ -35,27 +38,68 @@ public class TradeProposalStore: ObservableObject {
         }
     }
     
+    /// Pulls all proposals from Firebase Realtime Database and merges with local proposals
+    public func fetchRemoteProposals() async {
+        let remote = await FirebaseDatabaseService.shared.fetchProposals()
+        guard !remote.isEmpty else { return }
+        
+        for r in remote {
+            if let idx = proposals.firstIndex(where: { $0.id == r.id }) {
+                if r.updatedAt >= proposals[idx].updatedAt {
+                    proposals[idx] = r
+                }
+            } else {
+                proposals.append(r)
+            }
+        }
+        
+        proposals.sort { $0.updatedAt > $1.updatedAt }
+        saveProposals()
+    }
+    
+    // MARK: - Proposal Querying
+    
     // Incoming proposals sent to the current user (where current user is receiver and status is actionable)
+    public func incomingProposals(for user: User) -> [TradeProposal] {
+        return proposals.filter { $0.isIncoming(for: user) && ($0.status == .pending || $0.status == .countered) }
+    }
+    
     public func incomingProposals(for userId: UUID) -> [TradeProposal] {
         return proposals.filter { $0.receiverId == userId && ($0.status == .pending || $0.status == .countered) }
     }
     
     // Outgoing proposals sent by current user to others
+    public func outgoingProposals(for user: User) -> [TradeProposal] {
+        return proposals.filter { $0.isOutgoing(for: user) && ($0.status == .pending || $0.status == .countered) }
+    }
+    
     public func outgoingProposals(for userId: UUID) -> [TradeProposal] {
         return proposals.filter { $0.initiatorId == userId && ($0.status == .pending || $0.status == .countered) }
     }
     
     // Active agreed deals waiting for physical meetup / shipment
+    public func activeDeals(for user: User) -> [TradeProposal] {
+        return proposals.filter { ($0.isIncoming(for: user) || $0.isOutgoing(for: user)) && $0.status == .accepted }
+    }
+    
     public func activeDeals(for userId: UUID) -> [TradeProposal] {
         return proposals.filter { ($0.initiatorId == userId || $0.receiverId == userId) && $0.status == .accepted }
     }
     
     // Past completed or archived trades
+    public func pastTrades(for user: User) -> [TradeProposal] {
+        return proposals.filter { ($0.isIncoming(for: user) || $0.isOutgoing(for: user)) && ($0.status == .completed || $0.status == .declined || $0.status == .cancelled) }
+    }
+    
     public func pastTrades(for userId: UUID) -> [TradeProposal] {
         return proposals.filter { ($0.initiatorId == userId || $0.receiverId == userId) && ($0.status == .completed || $0.status == .declined || $0.status == .cancelled) }
     }
     
     // Total pending badge count
+    public func pendingCount(for user: User) -> Int {
+        return incomingProposals(for: user).count
+    }
+    
     public func pendingCount(for userId: UUID) -> Int {
         return incomingProposals(for: userId).count
     }
@@ -72,6 +116,8 @@ public class TradeProposalStore: ObservableObject {
         receiverName: String,
         receiverAvatar: String,
         receiverRating: Double,
+        receiverEmail: String = "",
+        receiverPhone: String = "",
         offeredItems: [Item],
         requestedItems: [Item],
         note: String,
@@ -82,10 +128,14 @@ public class TradeProposalStore: ObservableObject {
             initiatorName: initiator.displayName,
             initiatorAvatar: initiator.avatar,
             initiatorRating: initiator.rating,
+            initiatorEmail: initiator.email,
+            initiatorPhone: initiator.phoneNumber,
             receiverId: receiverId,
             receiverName: receiverName,
             receiverAvatar: receiverAvatar,
             receiverRating: receiverRating,
+            receiverEmail: receiverEmail,
+            receiverPhone: receiverPhone,
             offeredItems: offeredItems,
             requestedItems: requestedItems,
             note: note,
@@ -95,6 +145,12 @@ public class TradeProposalStore: ObservableObject {
         
         proposals.insert(proposal, at: 0)
         saveProposals()
+        
+        // Push proposal to Firebase Realtime Database
+        Task {
+            await FirebaseDatabaseService.shared.publishProposal(proposal)
+        }
+        
         AppTheme.triggerNotificationHaptic(type: .success)
         return proposal
     }
@@ -104,6 +160,10 @@ public class TradeProposalStore: ObservableObject {
             proposals[index].status = .accepted
             proposals[index].updatedAt = Date()
             saveProposals()
+            
+            Task {
+                await FirebaseDatabaseService.shared.updateProposalStatus(id: proposalId, status: .accepted)
+            }
             AppTheme.triggerNotificationHaptic(type: .success)
         }
     }
@@ -113,6 +173,10 @@ public class TradeProposalStore: ObservableObject {
             proposals[index].status = .declined
             proposals[index].updatedAt = Date()
             saveProposals()
+            
+            Task {
+                await FirebaseDatabaseService.shared.updateProposalStatus(id: proposalId, status: .declined)
+            }
             AppTheme.triggerNotificationHaptic(type: .warning)
         }
     }
@@ -122,6 +186,10 @@ public class TradeProposalStore: ObservableObject {
             proposals[index].status = .cancelled
             proposals[index].updatedAt = Date()
             saveProposals()
+            
+            Task {
+                await FirebaseDatabaseService.shared.updateProposalStatus(id: proposalId, status: .cancelled)
+            }
             AppTheme.triggerHaptic(style: .medium)
         }
     }
@@ -151,6 +219,11 @@ public class TradeProposalStore: ObservableObject {
             proposals[index].status = .countered
             proposals[index].updatedAt = Date()
             saveProposals()
+            
+            let updated = proposals[index]
+            Task {
+                await FirebaseDatabaseService.shared.publishProposal(updated)
+            }
             AppTheme.triggerNotificationHaptic(type: .success)
         }
     }
@@ -160,6 +233,10 @@ public class TradeProposalStore: ObservableObject {
             proposals[index].status = .completed
             proposals[index].updatedAt = Date()
             saveProposals()
+            
+            Task {
+                await FirebaseDatabaseService.shared.updateProposalStatus(id: proposalId, status: .completed)
+            }
             AppTheme.triggerNotificationHaptic(type: .success)
         }
     }
