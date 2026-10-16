@@ -112,7 +112,7 @@ public struct XchangeEmblemView: View {
             Capsule()
                 .fill(XchangeLogoView.brandGreen)
                 .frame(width: 9.5 * scale, height: 98 * scale)
-                .rotationEffect(.degrees(-44))
+                .rotationEffect(.degrees(44))
         }
         .frame(width: 92 * scale, height: 100 * scale)
     }

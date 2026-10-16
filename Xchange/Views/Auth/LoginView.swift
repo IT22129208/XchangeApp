@@ -63,28 +63,12 @@ public struct LoginView: View {
                         
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 20) {
-                                // Sheet Title & Firebase Status
-                                VStack(spacing: 6) {
-                                    Text("Log In")
-                                        .font(.system(size: 26, weight: .heavy, design: .rounded))
-                                        .foregroundColor(.white)
-                                    
-                                    // Firebase Connection Status Badge
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(fieldBorderGreen)
-                                            .frame(width: 7, height: 7)
-                                        Text("Firebase: xchange-52865")
-                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                            .foregroundColor(.white.opacity(0.75))
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(Color.white.opacity(0.08))
-                                    .clipShape(Capsule())
-                                }
-                                .padding(.top, 28)
-                                .padding(.bottom, 6)
+                                // Sheet Title
+                                Text("Log In")
+                                    .font(.system(size: 26, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .padding(.top, 28)
+                                    .padding(.bottom, 6)
                                 
                                 // Email Address Field
                                 inputField(
