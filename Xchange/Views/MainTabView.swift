@@ -154,16 +154,23 @@ public struct MainTabView: View {
                         .frame(height: 24)
                     
                     if tab == .messages {
-                        let count = tradeStore.pendingCount(for: userStore.currentUser)
+                        let count = tradeStore.notificationCount(for: userStore.currentUser)
                         if count > 0 {
-                            Text("\(count)")
-                                .font(.system(size: 9, weight: .heavy))
+                            Text(count > 99 ? "99+" : "\(count)")
+                                .font(.system(size: 10, weight: .black, design: .rounded))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(activeGreen)
-                                .clipShape(Capsule())
-                                .offset(x: 10, y: -4)
+                                .padding(.horizontal, count > 9 ? 5 : 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(Color(red: 0.95, green: 0.26, blue: 0.26))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color(red: 0.04, green: 0.05, blue: 0.06), lineWidth: 1.5)
+                                )
+                                .shadow(color: Color.red.opacity(0.4), radius: 3, y: 1)
+                                .offset(x: 12, y: -6)
                         }
                     }
                 }

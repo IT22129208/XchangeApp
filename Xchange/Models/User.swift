@@ -57,6 +57,7 @@ public struct User: Identifiable, Codable, Hashable {
     public var bio: String
     public var avatar: String
     public var location: String
+    public var district: String
     public var phoneNumber: String
     public var rating: Double
     
@@ -107,6 +108,7 @@ public struct User: Identifiable, Codable, Hashable {
         bio: String,
         avatar: String = "person.crop.circle.fill",
         location: String = "Colombo, Sri Lanka",
+        district: String = "Colombo",
         phoneNumber: String = "+94 76 555 1234",
         rating: Double = 4.9,
         tradesCompleted: Int = 14,
@@ -127,6 +129,7 @@ public struct User: Identifiable, Codable, Hashable {
         self.bio = bio
         self.avatar = avatar
         self.location = location
+        self.district = district
         self.phoneNumber = phoneNumber
         self.rating = rating
         self.tradesCompleted = tradesCompleted
@@ -138,7 +141,7 @@ public struct User: Identifiable, Codable, Hashable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, username, displayName, email, bio, avatar, location, phoneNumber
+        case id, username, displayName, email, bio, avatar, location, district, phoneNumber
         case rating, tradesCompleted, memberSince, isVerified, badges, wishlist, reviews
     }
     
@@ -150,7 +153,9 @@ public struct User: Identifiable, Codable, Hashable {
         email = try container.decode(String.self, forKey: .email)
         bio = try container.decode(String.self, forKey: .bio)
         avatar = try container.decodeIfPresent(String.self, forKey: .avatar) ?? "person.crop.circle.fill"
-        location = try container.decodeIfPresent(String.self, forKey: .location) ?? "Colombo, Sri Lanka"
+        let decodedLocation = try container.decodeIfPresent(String.self, forKey: .location) ?? "Colombo, Sri Lanka"
+        location = decodedLocation
+        district = try container.decodeIfPresent(String.self, forKey: .district) ?? SriLankaDistrict.detectDistrict(from: decodedLocation) ?? "Colombo"
         phoneNumber = try container.decodeIfPresent(String.self, forKey: .phoneNumber) ?? "+94 76 555 1234"
         rating = try container.decodeIfPresent(Double.self, forKey: .rating) ?? 4.9
         tradesCompleted = try container.decodeIfPresent(Int.self, forKey: .tradesCompleted) ?? 0

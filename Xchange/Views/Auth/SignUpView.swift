@@ -18,6 +18,7 @@ public struct SignUpView: View {
     @State private var username: String = ""
     @State private var email: String = ""
     @State private var phoneNumber: String = ""
+    @State private var selectedDistrict: SriLankaDistrict = .colombo
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
     
@@ -106,14 +107,17 @@ public struct SignUpView: View {
                                 autocapitalization: .never
                             )
                             
-                            // 5. Password Field
+                            // 5. Sri Lanka District Field
+                            districtPickerField
+                            
+                            // 6. Password Field
                             secureInputField(
                                 icon: "lock.fill",
                                 placeholder: "Password",
                                 text: $password
                             )
                             
-                            // 6. Confirm Password Field
+                            // 7. Confirm Password Field
                             secureInputField(
                                 icon: "lock.fill",
                                 placeholder: "Confirm Password",
@@ -222,9 +226,59 @@ public struct SignUpView: View {
         .sheet(isPresented: $showTermsSheet) {
             TermsAndPrivacyModalView()
         }
+        .onChange(of: selectedDistrict) {
+            AppTheme.triggerHaptic(style: .light)
+        }
     }
     
     // MARK: - Subviews & Field Builders
+    
+    private var districtPickerField: some View {
+        Menu {
+            Picker("District", selection: $selectedDistrict) {
+                ForEach(SriLankaDistrict.allDistricts, id: \.self) { district in
+                    Text("\(district.rawValue) (\(district.province))")
+                        .tag(district)
+                }
+            }
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(fieldBorderGreen)
+                    .frame(width: 20)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("District")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(fieldBorderGreen.opacity(0.85))
+                    
+                    Text("\(selectedDistrict.rawValue) District")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                Text(selectedDistrict.province)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color.gray.opacity(0.75))
+                    .lineLimit(1)
+                
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(fieldBorderGreen)
+            }
+            .padding(.horizontal, 20)
+            .frame(height: 52)
+            .background(fieldDarkBackground)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(fieldBorderGreen, lineWidth: 1.5)
+            )
+        }
+    }
     
     private func inputField(
         icon: String,
@@ -345,13 +399,13 @@ public struct SignUpView: View {
                     displayName: activeName
                 )
                 
-                completeUserSetup(name: activeName, email: activeEmail, username: activeUsername, phone: activePhone)
+                completeUserSetup(name: activeName, email: activeEmail, username: activeUsername, phone: activePhone, district: selectedDistrict)
             } catch let error as FirebaseAuthError {
                 isSubmitting = false
                 switch error {
                 case .serverError(let msg) where msg.contains("CONFIGURATION_NOT_FOUND"):
                     // Seamless local registration if console provider is pending
-                    completeUserSetup(name: activeName, email: activeEmail, username: activeUsername, phone: activePhone)
+                    completeUserSetup(name: activeName, email: activeEmail, username: activeUsername, phone: activePhone, district: selectedDistrict)
                 default:
                     alertTitle = "Registration Failed"
                     alertMessage = error.localizedDescription
@@ -368,7 +422,7 @@ public struct SignUpView: View {
         }
     }
     
-    private func completeUserSetup(name: String, email: String, username: String, phone: String) {
+    private func completeUserSetup(name: String, email: String, username: String, phone: String, district: SriLankaDistrict) {
         let cleanUsername = username.isEmpty ? (email.components(separatedBy: "@").first ?? "trader") : username
         userStore.applyUserIdentity(
             email: email,
@@ -376,6 +430,8 @@ public struct SignUpView: View {
             firebaseUid: FirebaseAuthService.shared.activeFirebaseUser?.localId
         )
         userStore.currentUser.username = cleanUsername
+        userStore.currentUser.district = district.rawValue
+        userStore.currentUser.location = "\(district.rawValue), Sri Lanka"
         if !phone.isEmpty {
             userStore.currentUser.phoneNumber = phone
         }

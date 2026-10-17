@@ -15,6 +15,7 @@ public struct FilterSheetView: View {
     @State private var tempCondition: ItemCondition?
     @State private var tempMaxPrice: Double
     @State private var tempSort: ItemStore.ItemSortOption
+    @State private var tempDistrict: SriLankaDistrict
     
     public init(itemStore: ItemStore) {
         self.itemStore = itemStore
@@ -22,6 +23,7 @@ public struct FilterSheetView: View {
         _tempCondition = State(initialValue: itemStore.selectedConditionFilter)
         _tempMaxPrice = State(initialValue: itemStore.maxPriceFilter)
         _tempSort = State(initialValue: itemStore.sortBy)
+        _tempDistrict = State(initialValue: itemStore.selectedDistrictFilter)
     }
     
     public var body: some View {
@@ -35,6 +37,17 @@ public struct FilterSheetView: View {
                                 Image(systemName: category.systemIcon)
                                 Text(category.rawValue)
                             }.tag(category)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                
+                // District / Region Section
+                Section(header: Text("District / Location")) {
+                    Picker("District", selection: $tempDistrict) {
+                        Text("🇱🇰 All Sri Lanka (Entire Country)").tag(SriLankaDistrict.all)
+                        ForEach(SriLankaDistrict.allDistricts, id: \.self) { district in
+                            Text("\(district.rawValue) (\(district.province))").tag(district)
                         }
                     }
                     .pickerStyle(.menu)
@@ -89,6 +102,7 @@ public struct FilterSheetView: View {
                         tempCondition = nil
                         tempMaxPrice = 500000
                         tempSort = .newest
+                        tempDistrict = .all
                         AppTheme.triggerHaptic(style: .light)
                     } label: {
                         HStack {
@@ -114,6 +128,7 @@ public struct FilterSheetView: View {
                         itemStore.selectedConditionFilter = tempCondition
                         itemStore.maxPriceFilter = tempMaxPrice
                         itemStore.sortBy = tempSort
+                        itemStore.selectedDistrictFilter = tempDistrict
                         AppTheme.triggerNotificationHaptic(type: .success)
                         dismiss()
                     }

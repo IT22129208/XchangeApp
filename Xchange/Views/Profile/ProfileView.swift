@@ -182,41 +182,13 @@ public struct ProfileView: View {
                 showEditProfileSheet = true
             } label: {
                 ZStack(alignment: .bottomTrailing) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 92, height: 92)
-                        
-                        if let customImg = PersistenceService.shared.resolveImage(nameOrPath: user.avatar) {
-                            Image(uiImage: customImg)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 88, height: 88)
-                                .clipShape(Circle())
-                        } else if UIImage(named: user.avatar) != nil {
-                            Image(user.avatar)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 88, height: 88)
-                                .clipShape(Circle())
-                        } else if UIImage(named: "user_avatar_profile") != nil {
-                            Image("user_avatar_profile")
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 88, height: 88)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: user.avatar)
-                                .font(.system(size: 52))
-                                .foregroundColor(accentGreen)
-                                .frame(width: 88, height: 88)
-                                .background(accentGreen.opacity(0.15))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(accentGreen.opacity(0.4), lineWidth: 1.5)
+                    UserAvatarView(
+                        avatar: user.avatar,
+                        size: 88,
+                        accentColor: accentGreen,
+                        showBorder: true,
+                        borderColor: accentGreen.opacity(0.4),
+                        borderWidth: 1.5
                     )
                     
                     // Subtle Camera Icon Badge
@@ -789,6 +761,7 @@ public struct ProfileView: View {
 
 private struct EditProfileModalView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var itemStore: ItemStore
     let user: User
     let userStore: UserStore
     
@@ -798,6 +771,7 @@ private struct EditProfileModalView: View {
     @State private var phoneNumber: String = ""
     @State private var location: String = ""
     @State private var bio: String = ""
+    @State private var selectedDistrict: SriLankaDistrict = .colombo
     
     // Photo Picker State
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
@@ -850,6 +824,51 @@ private struct EditProfileModalView: View {
                                 icon: "phone.fill",
                                 keyboardType: .phonePad
                             )
+                            
+                            // District Selector
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("District (Sri Lanka)")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.85))
+                                
+                                Menu {
+                                    Picker("District", selection: $selectedDistrict) {
+                                        ForEach(SriLankaDistrict.allDistricts, id: \.self) { dist in
+                                            Text("\(dist.rawValue) (\(dist.province))")
+                                                .tag(dist)
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "mappin.circle.fill")
+                                            .font(.system(size: 15))
+                                            .foregroundColor(accentGreen)
+                                            .frame(width: 20)
+                                        
+                                        Text("\(selectedDistrict.rawValue) District")
+                                            .font(.system(size: 15))
+                                            .foregroundColor(.white)
+                                        
+                                        Spacer()
+                                        
+                                        Text(selectedDistrict.province)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Color.gray.opacity(0.7))
+                                        
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(accentGreen)
+                                    }
+                                    .padding(.horizontal, 14)
+                                    .frame(height: 50)
+                                    .background(fieldBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(fieldBorder, lineWidth: 1)
+                                    )
+                                }
+                            }
                             
                             inputField(
                                 label: "Location",
@@ -928,6 +947,7 @@ private struct EditProfileModalView: View {
                 email = user.email
                 phoneNumber = user.phoneNumber
                 location = user.location
+                selectedDistrict = SriLankaDistrict.allDistricts.first(where: { $0.rawValue.caseInsensitiveCompare(user.district) == .orderedSame }) ?? (SriLankaDistrict.detectDistrict(from: user.location).flatMap { det in SriLankaDistrict.allDistricts.first(where: { $0.rawValue.caseInsensitiveCompare(det) == .orderedSame }) } ?? .colombo)
                 bio = user.bio
             }
             .onChange(of: selectedPhotoItem) { _, newItem in
@@ -942,6 +962,10 @@ private struct EditProfileModalView: View {
                     }
                 }
             }
+            .onChange(of: selectedDistrict) { _, dist in
+                location = "\(dist.rawValue), Sri Lanka"
+                AppTheme.triggerHaptic(style: .light)
+            }
         }
     }
     
@@ -952,47 +976,14 @@ private struct EditProfileModalView: View {
             PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                 ZStack(alignment: .bottomTrailing) {
                     // Avatar Image Display
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 104, height: 104)
-                        
-                        if let selectedImage = selectedImage {
-                            Image(uiImage: selectedImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                        } else if let customImg = PersistenceService.shared.resolveImage(nameOrPath: user.avatar) {
-                            Image(uiImage: customImg)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                        } else if UIImage(named: user.avatar) != nil {
-                            Image(user.avatar)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                        } else if UIImage(named: "user_avatar_profile") != nil {
-                            Image("user_avatar_profile")
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: user.avatar)
-                                .font(.system(size: 56))
-                                .foregroundColor(accentGreen)
-                                .frame(width: 100, height: 100)
-                                .background(accentGreen.opacity(0.15))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(accentGreen, lineWidth: 2)
+                    UserAvatarView(
+                        avatar: user.avatar,
+                        fallbackImage: selectedImage,
+                        size: 100,
+                        accentColor: accentGreen,
+                        showBorder: true,
+                        borderColor: accentGreen,
+                        borderWidth: 2
                     )
                     
                     // Camera Badge
@@ -1066,28 +1057,38 @@ private struct EditProfileModalView: View {
         isSaving = true
         AppTheme.triggerHaptic(style: .medium)
         
+        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLoc = location.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUser = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let dist = selectedDistrict.rawValue
+        
         if let image = selectedImage {
             userStore.updateProfilePhoto(image)
         }
         
         userStore.updateProfile(
-            displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
-            bio: bio.trimmingCharacters(in: .whitespacesAndNewlines),
-            location: location.trimmingCharacters(in: .whitespacesAndNewlines),
-            email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-            username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-            phoneNumber: phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+            displayName: trimmedName,
+            bio: trimmedBio,
+            location: trimmedLoc,
+            email: trimmedEmail,
+            username: trimmedUser,
+            phoneNumber: trimmedPhone,
+            district: dist
         )
         
-        // Synchronize profile changes to Firebase Realtime Database
         let updatedUser = userStore.currentUser
         let avatarImg = selectedImage
+        itemStore.updateOwnerProfileForItems(user: updatedUser)
+        
         Task { @MainActor in
             await FirebaseDatabaseService.shared.saveUserProfile(updatedUser, avatarImage: avatarImg)
+            isSaving = false
+            AppTheme.triggerNotificationHaptic(type: .success)
+            dismiss()
         }
-        
-        AppTheme.triggerNotificationHaptic(type: .success)
-        dismiss()
     }
 }
 

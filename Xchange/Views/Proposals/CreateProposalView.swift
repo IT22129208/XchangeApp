@@ -238,6 +238,8 @@ public struct CreateProposalView: View {
                     receiverRating: targetItem.ownerRating,
                     receiverEmail: targetItem.ownerEmail,
                     receiverPhone: targetItem.ownerPhone,
+                    receiverDistrict: targetItem.district,
+                    receiverLocation: targetItem.ownerLocation,
                     offeredItems: selectedOfferedItems,
                     requestedItems: [targetItem],
                     note: tradeNote.trimmingCharacters(in: .whitespacesAndNewlines)

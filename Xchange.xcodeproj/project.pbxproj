@@ -57,6 +57,9 @@
 		B1049 /* FirebaseAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1049 /* FirebaseAuthService.swift */; };
 		B1050 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F1050 /* GoogleService-Info.plist */; };
 		B1051 /* FirebaseDatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1051 /* FirebaseDatabaseService.swift */; };
+		B1052 /* SriLankaDistrict.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1052 /* SriLankaDistrict.swift */; };
+		B1053 /* UserAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1053 /* UserAvatarView.swift */; };
+		B1054 /* EditItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1054 /* EditItemView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -111,6 +114,9 @@
 		F1049 /* FirebaseAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseAuthService.swift; sourceTree = "<group>"; };
 		F1050 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		F1051 /* FirebaseDatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseDatabaseService.swift; sourceTree = "<group>"; };
+		F1052 /* SriLankaDistrict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SriLankaDistrict.swift; sourceTree = "<group>"; };
+		F1053 /* UserAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatarView.swift; sourceTree = "<group>"; };
+		F1054 /* EditItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditItemView.swift; sourceTree = "<group>"; };
 		P1000 /* Xchange.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Xchange.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -172,6 +178,7 @@
 				F1005 /* Message.swift */,
 				F1032 /* SafeZone.swift */,
 				F1033 /* AppraisalResult.swift */,
+				F1052 /* SriLankaDistrict.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -251,6 +258,7 @@
 			children = (
 				F1019 /* MyItemsView.swift */,
 				F1020 /* AddItemView.swift */,
+				F1054 /* EditItemView.swift */,
 			);
 			path = Inventory;
 			sourceTree = "<group>";
@@ -283,6 +291,7 @@
 				F1037 /* ConfettiView.swift */,
 				F1038 /* SafeZoneRadarBadge.swift */,
 				F1039 /* ARTradePreviewView.swift */,
+				F1053 /* UserAvatarView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -401,6 +410,7 @@
 				B1018 /* ProposalsListView.swift in Sources */,
 				B1019 /* MyItemsView.swift in Sources */,
 				B1020 /* AddItemView.swift in Sources */,
+				B1054 /* EditItemView.swift in Sources */,
 				B1021 /* TradeChatView.swift in Sources */,
 				B1022 /* ProfileView.swift in Sources */,
 				B1023 /* ItemCard.swift in Sources */,
@@ -429,6 +439,8 @@
 				B1048 /* HomeLandingView.swift in Sources */,
 				B1049 /* FirebaseAuthService.swift in Sources */,
 				B1051 /* FirebaseDatabaseService.swift in Sources */,
+				B1052 /* SriLankaDistrict.swift in Sources */,
+				B1053 /* UserAvatarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

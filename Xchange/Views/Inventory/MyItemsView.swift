@@ -13,6 +13,7 @@ public struct MyItemsView: View {
     
     @State private var showAddItemSheet = false
     @State private var selectedItemForDetail: Item? = nil
+    @State private var itemToEdit: Item? = nil
     
     private var myItems: [Item] {
         itemStore.userItems(for: userStore.currentUser)
@@ -77,6 +78,9 @@ public struct MyItemsView: View {
 
             .sheet(item: $selectedItemForDetail) { item in
                 ItemDetailView(item: item)
+            }
+            .sheet(item: $itemToEdit) { item in
+                EditItemView(item: item)
             }
         }
     }
@@ -194,14 +198,33 @@ public struct MyItemsView: View {
             
             Spacer()
             
-            // Status Tag
-            Text(item.status.rawValue)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundColor(item.status.color)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(item.status.color.opacity(0.12))
-                .clipShape(Capsule())
+            // Status Tag & Quick Edit Button
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(item.status.rawValue)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(item.status.color)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(item.status.color.opacity(0.12))
+                    .clipShape(Capsule())
+                
+                Button {
+                    itemToEdit = item
+                    AppTheme.triggerHaptic(style: .medium)
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "square.and.pencil")
+                        Text("Edit")
+                    }
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3.5)
+                    .background(AppTheme.primary.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
         }
         .padding(12)
         .background(Color(UIColor.secondarySystemGroupedBackground))
@@ -210,6 +233,19 @@ public struct MyItemsView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
+        .contextMenu {
+            Button {
+                itemToEdit = item
+            } label: {
+                Label("Edit Details", systemImage: "square.and.pencil")
+            }
+            
+            Button(role: .destructive) {
+                itemStore.deleteItem(byId: item.id)
+            } label: {
+                Label("Delete Listing", systemImage: "trash")
+            }
+        }
     }
     
     private var emptyClosetView: some View {

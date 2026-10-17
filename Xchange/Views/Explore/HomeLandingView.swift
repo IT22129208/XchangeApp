@@ -20,6 +20,9 @@ public struct HomeLandingView: View {
     @State private var searchText: String = ""
     @State private var selectedItemForDetail: Item? = nil
     @State private var selectedCategoryFilter: ItemCategory = .all
+    @State private var selectedDistrict: SriLankaDistrict = .all
+    @State private var hasInitializedDistrict: Bool = false
+    @State private var showDistrictPickerSheet: Bool = false
     
     // Official theme brand colors
     private let fieldBorderGreen = Color(red: 0.24, green: 0.65, blue: 0.38)
@@ -68,6 +71,11 @@ public struct HomeLandingView: View {
             // Category filter check
             if selectedCategoryFilter != .all {
                 guard item.category == selectedCategoryFilter else { return false }
+            }
+            
+            // District filter check (area-specific vs entire country)
+            if selectedDistrict != .all {
+                guard item.matchesDistrict(selectedDistrict) else { return false }
             }
             
             // Real-time search query filtering (does not wait for submit button)
@@ -138,6 +146,25 @@ public struct HomeLandingView: View {
         .sheet(item: $selectedItemForDetail) { item in
             ItemDetailView(item: item)
         }
+        .sheet(isPresented: $showDistrictPickerSheet) {
+            DistrictPickerModalView(selectedDistrict: $selectedDistrict)
+                .environmentObject(itemStore)
+                .environmentObject(userStore)
+        }
+        .onAppear {
+            if !hasInitializedDistrict {
+                let userDist = userStore.currentUser.district.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !userDist.isEmpty, let matched = SriLankaDistrict.allDistricts.first(where: { $0.rawValue.caseInsensitiveCompare(userDist) == .orderedSame }) {
+                    selectedDistrict = matched
+                } else if let detected = SriLankaDistrict.detectDistrict(from: userStore.currentUser.location),
+                          let matched = SriLankaDistrict.allDistricts.first(where: { $0.rawValue.caseInsensitiveCompare(detected) == .orderedSame }) {
+                    selectedDistrict = matched
+                } else {
+                    selectedDistrict = .colombo
+                }
+                hasInitializedDistrict = true
+            }
+        }
     }
     
     // MARK: - Top Header White Banner
@@ -157,31 +184,80 @@ public struct HomeLandingView: View {
         .shadow(color: Color.black.opacity(0.3), radius: 10, y: 4)
     }
     
-    // MARK: - Welcome Greeting Header
+    // MARK: - Welcome Greeting Header with Interactive District Location
     
     private var welcomeGreetingHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Welcome, \(greetingName)!")
                 .font(.system(size: 26, weight: .heavy, design: .rounded))
                 .foregroundColor(.white)
             
-            HStack(spacing: 5) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(fieldBorderGreen)
-                
-                Text(userStore.currentUser.location)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.85))
+            // Interactive District Selector below the Welcome word
+            HStack(spacing: 8) {
+                districtSelectorMenu
                 
                 Text("•")
-                    .foregroundColor(Color.gray.opacity(0.6))
+                    .foregroundColor(Color.gray.opacity(0.5))
                 
-                Text("LKR Currency Active")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(fieldBorderGreen)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(fieldBorderGreen)
+                        .frame(width: 6, height: 6)
+                    Text("LKR Active")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(fieldBorderGreen)
+                }
             }
         }
+    }
+    
+    private var districtSelectorMenu: some View {
+        Menu {
+            // Search / View All Sheet Option
+            Button {
+                showDistrictPickerSheet = true
+                AppTheme.triggerHaptic(style: .light)
+            } label: {
+                Label("Search / Browse All Districts...", systemImage: "magnifyingglass")
+            }
+            
+            Divider()
+            
+            // All Districts of Sri Lanka + Countrywide View
+            Picker("Select District", selection: $selectedDistrict) {
+                Text("🇱🇰 All Sri Lanka (Entire Country)").tag(SriLankaDistrict.all)
+                ForEach(SriLankaDistrict.allDistricts, id: \.self) { district in
+                    Text("\(district.rawValue) (\(districtAdCount(for: district)) ads)").tag(district)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(fieldBorderGreen)
+                
+                Text(selectedDistrict == .all ? "All Sri Lanka (Entire Country)" : "\(selectedDistrict.rawValue), Sri Lanka")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundColor(fieldBorderGreen)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(0.08))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(fieldBorderGreen.opacity(0.7), lineWidth: 1.2)
+            )
+        }
+    }
+    
+    private func districtAdCount(for district: SriLankaDistrict) -> Int {
+        itemStore.items.filter { $0.status != .traded && $0.matchesDistrict(district) }.count
     }
     
     // MARK: - Real-time Auto-Filtering Search Bar
@@ -304,7 +380,23 @@ public struct HomeLandingView: View {
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     
-                    if !searchText.isEmpty {
+                    if selectedDistrict != .all {
+                        HStack(spacing: 4) {
+                            Text("Area: \(selectedDistrict.rawValue) District")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(fieldBorderGreen)
+                            
+                            Button {
+                                selectedDistrict = .all
+                                AppTheme.triggerNotificationHaptic(type: .success)
+                            } label: {
+                                Text("(Show All)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .underline()
+                            }
+                        }
+                    } else if !searchText.isEmpty {
                         Text("Filtered by: \"\(searchText)\"")
                             .font(.system(size: 12))
                             .foregroundColor(fieldBorderGreen)
@@ -312,6 +404,10 @@ public struct HomeLandingView: View {
                         Text("Category: \(selectedCategoryFilter.rawValue)")
                             .font(.system(size: 12))
                             .foregroundColor(fieldBorderGreen)
+                    } else {
+                        Text("All Sri Lanka (Entire Country)")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.gray.opacity(0.8))
                     }
                 }
                 
@@ -499,45 +595,90 @@ public struct HomeLandingView: View {
         }
     }
     
-    // Empty state when search or category filter yields no matches
+    // Empty state when search or district filter yields no matches
     private var emptyRecentListingsView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             ZStack {
                 Circle()
                     .fill(fieldBorderGreen.opacity(0.12))
-                    .frame(width: 54, height: 54)
-                Image(systemName: "magnifyingglass")
+                    .frame(width: 58, height: 58)
+                Image(systemName: selectedDistrict != .all ? "mappin.slash" : "magnifyingglass")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(fieldBorderGreen)
             }
             
-            Text("No recent listings found")
-                .font(.system(size: 16, weight: .bold))
+            Text(selectedDistrict != .all ? "No Ads in \(selectedDistrict.rawValue) District" : "No recent listings found")
+                .font(.system(size: 17, weight: .bold))
                 .foregroundColor(.white)
             
-            Text("No items match \"\(searchText.isEmpty ? selectedCategoryFilter.rawValue : searchText)\" in Sri Lanka.")
-                .font(.system(size: 13))
-                .foregroundColor(Color.gray.opacity(0.8))
-                .multilineTextAlignment(.center)
-            
-            Button {
-                withAnimation {
-                    searchText = ""
-                    itemStore.searchQuery = ""
-                    selectedCategoryFilter = .all
-                    itemStore.selectedCategory = .all
+            if selectedDistrict != .all {
+                Text("There are no active barter goods in \(selectedDistrict.rawValue) right now. You can switch to another district or view all ads across the entire country.")
+                    .font(.system(size: 13))
+                    .foregroundColor(Color.gray.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+                
+                HStack(spacing: 10) {
+                    Button {
+                        withAnimation {
+                            selectedDistrict = .all
+                        }
+                        AppTheme.triggerNotificationHaptic(type: .success)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "globe.asia.australia.fill")
+                            Text("See All Sri Lanka Ads")
+                        }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 9)
+                        .background(fieldBorderGreen)
+                        .clipShape(Capsule())
+                    }
+                    
+                    Button {
+                        showDistrictPickerSheet = true
+                        AppTheme.triggerHaptic(style: .light)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.swap")
+                            Text("Change District")
+                        }
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
                 }
-                AppTheme.triggerHaptic(style: .light)
-            } label: {
-                Text("Clear All Filters")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(fieldBorderGreen)
-                    .clipShape(Capsule())
+                .padding(.top, 4)
+            } else {
+                Text("No items match \"\(searchText.isEmpty ? selectedCategoryFilter.rawValue : searchText)\" in Sri Lanka.")
+                    .font(.system(size: 13))
+                    .foregroundColor(Color.gray.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                
+                Button {
+                    withAnimation {
+                        searchText = ""
+                        itemStore.searchQuery = ""
+                        selectedCategoryFilter = .all
+                        itemStore.selectedCategory = .all
+                    }
+                    AppTheme.triggerHaptic(style: .light)
+                } label: {
+                    Text("Clear All Filters")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(fieldBorderGreen)
+                        .clipShape(Capsule())
+                }
+                .padding(.top, 4)
             }
-            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
         .padding(28)
@@ -609,6 +750,242 @@ public struct HomeLandingView: View {
                 .padding(.horizontal, 20)
             }
         }
+    }
+}
+
+// MARK: - District Picker Sheet Modal
+
+public struct DistrictPickerModalView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var itemStore: ItemStore
+    @EnvironmentObject var userStore: UserStore
+    
+    @Binding var selectedDistrict: SriLankaDistrict
+    @State private var searchQuery: String = ""
+    
+    private let fieldBorderGreen = Color(red: 0.24, green: 0.65, blue: 0.38)
+    private let cardBackground = Color(red: 0.09, green: 0.12, blue: 0.14)
+    private let fieldDarkBackground = Color(red: 0.08, green: 0.11, blue: 0.13)
+    
+    private var filteredDistricts: [SriLankaDistrict] {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty {
+            return SriLankaDistrict.allDistricts
+        }
+        return SriLankaDistrict.allDistricts.filter { district in
+            district.rawValue.lowercased().contains(query) ||
+            district.province.lowercased().contains(query)
+        }
+    }
+    
+    public init(selectedDistrict: Binding<SriLankaDistrict>) {
+        self._selectedDistrict = selectedDistrict
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                VStack(spacing: 14) {
+                    // Search bar
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(fieldBorderGreen)
+                            .font(.system(size: 15, weight: .bold))
+                        
+                        TextField(
+                            "",
+                            text: $searchQuery,
+                            prompt: Text("Search district or province...").foregroundColor(Color.gray.opacity(0.6))
+                        )
+                        .font(.system(size: 15))
+                        .foregroundColor(.white)
+                        .disableAutocorrection(true)
+                        
+                        if !searchQuery.isEmpty {
+                            Button {
+                                searchQuery = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(Color.gray)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 46)
+                    .background(fieldDarkBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(fieldBorderGreen.opacity(0.5), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 10) {
+                            // "All Sri Lanka (Entire Country)" Card
+                            if searchQuery.isEmpty || "all sri lanka entire country islandwide".contains(searchQuery.lowercased()) {
+                                Button {
+                                    selectedDistrict = .all
+                                    AppTheme.triggerNotificationHaptic(type: .success)
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(fieldBorderGreen.opacity(0.18))
+                                                .frame(width: 44, height: 44)
+                                            Image(systemName: "globe.asia.australia.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundColor(fieldBorderGreen)
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text("All Sri Lanka (Entire Country)")
+                                                .font(.system(size: 15, weight: .bold))
+                                                .foregroundColor(.white)
+                                            Text("See barter goods & ads from all 25 districts")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(Color.gray.opacity(0.8))
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        let totalCount = itemStore.items.filter { $0.status != .traded }.count
+                                        Text("\(totalCount) ads")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(fieldBorderGreen)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(fieldBorderGreen.opacity(0.15))
+                                            .clipShape(Capsule())
+                                        
+                                        if selectedDistrict == .all {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundColor(fieldBorderGreen)
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(cardBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(selectedDistrict == .all ? fieldBorderGreen : Color.white.opacity(0.08), lineWidth: selectedDistrict == .all ? 1.5 : 1)
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                            
+                            // Section header
+                            HStack {
+                                Text("SRI LANKAN DISTRICTS (\(filteredDistricts.count))")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color.gray)
+                                    .tracking(0.5)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.top, 8)
+                            
+                            // 25 Districts list
+                            ForEach(filteredDistricts, id: \.self) { district in
+                                districtCard(for: district)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 30)
+                    }
+                }
+            }
+            .navigationTitle("Select Location / District")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundColor(fieldBorderGreen)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func districtCard(for district: SriLankaDistrict) -> some View {
+        let adCount = itemStore.items.filter { $0.status != .traded && $0.matchesDistrict(district) }.count
+        
+        Button {
+            selectedDistrict = district
+            AppTheme.triggerNotificationHaptic(type: .success)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 14))
+                        .foregroundColor(selectedDistrict == district ? fieldBorderGreen : Color.gray)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(district.rawValue)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        if userStore.currentUser.district.caseInsensitiveCompare(district.rawValue) == .orderedSame {
+                            Text("Your Home")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(fieldBorderGreen)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(fieldBorderGreen.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    
+                    Text(district.province)
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.gray.opacity(0.75))
+                }
+                
+                Spacer()
+                
+                if adCount > 0 {
+                    Text("\(adCount) \(adCount == 1 ? "ad" : "ads")")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(fieldBorderGreen)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(fieldBorderGreen.opacity(0.12))
+                        .clipShape(Capsule())
+                } else {
+                    Text("0 ads")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.gray.opacity(0.5))
+                }
+                
+                if selectedDistrict == district {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(fieldBorderGreen)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(selectedDistrict == district ? fieldBorderGreen : Color.white.opacity(0.06), lineWidth: selectedDistrict == district ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

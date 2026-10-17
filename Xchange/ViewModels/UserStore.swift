@@ -41,6 +41,10 @@ public class UserStore: ObservableObject {
                 stored.location = "Malabe, Colombo, Sri Lanka"
                 needsSave = true
             }
+            if stored.district.isEmpty {
+                stored.district = SriLankaDistrict.detectDistrict(from: stored.location) ?? "Colombo"
+                needsSave = true
+            }
             if stored.email.lowercased() == "testuser1@xchange.lk" {
                 if stored.id != Self.testUser1Id {
                     stored.id = Self.testUser1Id
@@ -71,6 +75,10 @@ public class UserStore: ObservableObject {
         
         self.currentUser = loadedUser
         self.allUsers = initialUsers
+        
+        Task { [weak self] in
+            await self?.fetchRemoteProfile()
+        }
     }
     
     /// Switches and locks the active user identity and unique ID upon login or signup
@@ -99,18 +107,41 @@ public class UserStore: ObservableObject {
         saveCurrentUser()
     }
     
-    public func saveCurrentUser() {
+    /// Saves the current user profile locally to disk and automatically synchronizes with Firebase Realtime Database
+    public func saveCurrentUser(avatarImage: UIImage? = nil) {
         persistence.save(currentUser, to: PersistenceService.FileKey.user)
+        
+        // Automatically sync all profile changes & avatar to Firebase Realtime Database
+        let userToSync = currentUser
+        let avatarToSync = avatarImage ?? persistence.resolveImage(nameOrPath: userToSync.avatar)
+        Task { @MainActor in
+            await FirebaseDatabaseService.shared.saveUserProfile(userToSync, avatarImage: avatarToSync)
+        }
+    }
+    
+    /// Pulls the latest profile data and avatar photo from Firebase Realtime Database
+    public func fetchRemoteProfile() async {
+        let targetId = FirebaseDatabaseService.shared.resolveUserId(for: currentUser)
+        if let dict = await FirebaseDatabaseService.shared.fetchUserProfile(userId: targetId) {
+            FirebaseDatabaseService.shared.applyRemoteProfile(dict: dict, to: &currentUser)
+            persistence.save(currentUser, to: PersistenceService.FileKey.user)
+            print("Successfully refreshed remote profile from Firebase Database: \(currentUser.displayName)")
+        }
     }
     
     public func updateProfile(displayName: String, bio: String, location: String) {
-        updateProfile(displayName: displayName, bio: bio, location: location, email: nil, username: nil, phoneNumber: nil)
+        updateProfile(displayName: displayName, bio: bio, location: location, email: nil, username: nil, phoneNumber: nil, district: nil)
     }
     
-    public func updateProfile(displayName: String, bio: String, location: String, email: String? = nil, username: String? = nil, phoneNumber: String? = nil) {
+    public func updateProfile(displayName: String, bio: String, location: String, email: String? = nil, username: String? = nil, phoneNumber: String? = nil, district: String? = nil) {
         currentUser.displayName = displayName
         currentUser.bio = bio
         currentUser.location = location
+        if let district = district, !district.isEmpty {
+            currentUser.district = district
+        } else if currentUser.district.isEmpty {
+            currentUser.district = SriLankaDistrict.detectDistrict(from: location) ?? "Colombo"
+        }
         if let email = email, !email.isEmpty {
             currentUser.email = email
         }
@@ -128,7 +159,7 @@ public class UserStore: ObservableObject {
         let filename = "user_avatar_\(currentUser.id.uuidString).jpg"
         if persistence.saveImage(image, filename: filename) {
             currentUser.avatar = filename
-            saveCurrentUser()
+            saveCurrentUser(avatarImage: image)
             AppTheme.triggerNotificationHaptic(type: .success)
         }
     }
@@ -184,6 +215,7 @@ public class UserStore: ObservableObject {
             bio: "SLIIT Computing student & tech trader. Swapping audio gear, mechanical keyboards, camera primes, and retro games!",
             avatar: "person.crop.circle.fill",
             location: "Malabe, Colombo, Sri Lanka",
+            district: "Colombo",
             phoneNumber: "+94 76 555 1234",
             rating: 4.95,
             tradesCompleted: 18,
@@ -230,6 +262,7 @@ public class UserStore: ObservableObject {
             bio: "Photographer and drone flyer. Always looking for prime lenses and studio gear.",
             avatar: "camera.circle.fill",
             location: "Colombo 03, Sri Lanka",
+            district: "Colombo",
             phoneNumber: "+94 77 234 5678",
             rating: 4.88,
             tradesCompleted: 24,
@@ -245,6 +278,7 @@ public class UserStore: ObservableObject {
             bio: "Retro gamer & analog synthesizer collector. Willing to trade rare cartridges & eurorack modules!",
             avatar: "gamecontroller.circle.fill",
             location: "Kandy, Sri Lanka",
+            district: "Kandy",
             phoneNumber: "+94 71 345 6789",
             rating: 5.0,
             tradesCompleted: 31,
@@ -260,6 +294,7 @@ public class UserStore: ObservableObject {
             bio: "Outdoor & hiking gear lover. Looking for lightweight tents, GPS watches, and trail bikes.",
             avatar: "figure.hiking.circle.fill",
             location: "Galle Fort, Sri Lanka",
+            district: "Galle",
             phoneNumber: "+94 75 456 7890",
             rating: 4.79,
             tradesCompleted: 12,
@@ -275,6 +310,7 @@ public class UserStore: ObservableObject {
             bio: "Audiophile and vintage sound technician. Restoring Japanese turntables and tube amps.",
             avatar: "music.note.tv.fill",
             location: "Negombo, Sri Lanka",
+            district: "Gampaha",
             phoneNumber: "+94 78 567 8901",
             rating: 4.92,
             tradesCompleted: 40,

@@ -14,6 +14,7 @@ public struct TradeCard: View {
     var onAccept: (() -> Void)? = nil
     var onDecline: (() -> Void)? = nil
     var onCounter: (() -> Void)? = nil
+    var onComplete: (() -> Void)? = nil
     
     private var isIncoming: Bool {
         if let user = currentUser {
@@ -34,12 +35,7 @@ public struct TradeCard: View {
         VStack(alignment: .leading, spacing: 14) {
             // Header: Partner Info & Status Badge
             HStack(spacing: 10) {
-                Image(systemName: partnerAvatar)
-                    .font(.system(size: 24))
-                    .foregroundColor(AppTheme.primary)
-                    .frame(width: 40, height: 40)
-                    .background(AppTheme.primary.opacity(0.1))
-                    .clipShape(Circle())
+                UserAvatarView(avatar: partnerAvatar, size: 40)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
@@ -179,6 +175,81 @@ public struct TradeCard: View {
                 .foregroundColor(AppTheme.counterAccent)
             }
             
+            // Deal Accepted & Quick Contact Actions
+            if proposal.status == .accepted || proposal.status == .completed {
+                let accepted = proposal.acceptedTrader(currentUser: currentUser)
+                let partner = currentUser != nil ? proposal.partnerContact(currentUser: currentUser!) : accepted
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.green)
+                        
+                        Text(accepted.isCurrentUser ? "You accepted this deal" : "Deal accepted by \(accepted.name)")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Text(proposal.meetingLocation ?? "Safe Zone")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        // Call Button
+                        Button {
+                            let clean = partner.phone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                            if let url = URL(string: "tel://\(clean)") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "phone.fill")
+                                Text(partner.phone)
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.green)
+                            .clipShape(Capsule())
+                        }
+                        
+                        // WhatsApp Button
+                        Button {
+                            var clean = partner.phone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                            if clean.hasPrefix("0") { clean = "94" + clean.dropFirst() }
+                            if let url = URL(string: "https://wa.me/\(clean)") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "message.fill")
+                                Text("WhatsApp")
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(red: 0.15, green: 0.68, blue: 0.38))
+                            .clipShape(Capsule())
+                        }
+                        
+                        Spacer()
+                    }
+                }
+                .padding(10)
+                .background(Color.green.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.green.opacity(0.25), lineWidth: 1)
+                )
+            }
+            
             // Quick Action Buttons if Incoming & Actionable
             if isIncoming && (proposal.status == .pending || proposal.status == .countered) {
                 HStack(spacing: 8) {
@@ -225,6 +296,98 @@ public struct TradeCard: View {
                         .padding(.vertical, 8)
                         .background(AppTheme.tradeGradient)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+                .padding(.top, 4)
+            }
+            
+            // Complete Deal Action Section for Active Deals (Requires both users to confirm)
+            if proposal.status == .accepted {
+                let userConfirmed = currentUser != nil ? proposal.hasUserConfirmedCompletion(user: currentUser!) : false
+                let partnerConfirmed = currentUser != nil ? proposal.hasPartnerConfirmedCompletion(user: currentUser!) : false
+                
+                VStack(spacing: 8) {
+                    // Two-Party Completion Status Indicator
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: userConfirmed ? "checkmark.circle.fill" : "circle.dashed")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(userConfirmed ? .green : .secondary)
+                            Text("You (1/2)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(userConfirmed ? .primary : .secondary)
+                        }
+                        
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary.opacity(0.6))
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: partnerConfirmed ? "checkmark.circle.fill" : "circle.dashed")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(partnerConfirmed ? .green : .secondary)
+                            Text("\(partnerName) (2/2)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(partnerConfirmed ? .primary : .secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Text(userConfirmed ? "Waiting for Partner" : (partnerConfirmed ? "Partner Confirmed!" : "Both Must Confirm"))
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(partnerConfirmed && !userConfirmed ? Color(red: 0.95, green: 0.35, blue: 0.2) : (userConfirmed ? Color.orange : .secondary))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(UIColor.tertiarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    
+                    // Complete Action Button
+                    if userConfirmed {
+                        Button {
+                            AppTheme.triggerHaptic(style: .light)
+                            onComplete?()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock.badge.checkmark.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("Awaiting \(partnerName) Confirmation (1/2)")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.orange.opacity(0.85))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    } else {
+                        Button {
+                            AppTheme.triggerHaptic(style: .medium)
+                            onComplete?()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text(partnerConfirmed ? "Partner Confirmed! Complete Deal (2/2)" : "Complete Deal (Both Must Confirm)")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                LinearGradient(
+                                    colors: partnerConfirmed
+                                        ? [Color(red: 0.15, green: 0.75, blue: 0.40), Color(red: 0.10, green: 0.58, blue: 0.30)]
+                                        : [Color(red: 0.20, green: 0.65, blue: 0.35), Color(red: 0.12, green: 0.52, blue: 0.28)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .shadow(color: Color.green.opacity(0.35), radius: 5, y: 2)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.top, 4)

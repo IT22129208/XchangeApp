@@ -3,11 +3,12 @@
 //  Xchange
 //
 //  Created for Xchange - Peer-to-Peer Barter App
-//  Implements CoreML & Vision AI Camera Appraisal Sheet (Rubric Section 6)
+//  Implements CoreML, Apple Vision & Google Market Data Appraisal (Rubric Section 6)
 //
 
 import SwiftUI
 import PhotosUI
+import AVFoundation
 
 public struct SmartAppraisalModalView: View {
     @Environment(\.dismiss) private var dismiss
@@ -27,6 +28,16 @@ public struct SmartAppraisalModalView: View {
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var laserOffset: CGFloat = -100
     @State private var currentResult: AppraisalResult? = nil
+    
+    // Photo & Camera states
+    @State private var showCameraPicker: Bool = false
+    @State private var showPhotosPicker: Bool = false
+    @State private var showCameraUnavailableAlert: Bool = false
+    @State private var showCameraPermissionAlert: Bool = false
+    
+    private var effectiveImage: UIImage? {
+        scannedImage ?? initialImage
+    }
     
     public init(
         initialTitle: String = "",
@@ -51,15 +62,20 @@ public struct SmartAppraisalModalView: View {
                     // Stage 1: Camera Scanner Stage
                     scannerStage
                     
-                    // Stage 2: Category Selector
-                    categorySelectorSection
-                    
-                    // Stage 3: ML Appraisal Results Card
-                    if let result = currentResult {
-                        appraisalResultsCard(result)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else if mlService.isAnalyzing {
-                        analyzingSkeletonCard
+                    // Stage 2: Empty Image State OR Appraisal Content
+                    if effectiveImage == nil {
+                        noImageUploadedCard
+                    } else {
+                        // Category Selector
+                        categorySelectorSection
+                        
+                        // ML Appraisal Results Card
+                        if let result = currentResult {
+                            appraisalResultsCard(result)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        } else if mlService.isAnalyzing {
+                            analyzingSkeletonCard
+                        }
                     }
                 }
                 .padding(16)
@@ -74,6 +90,29 @@ public struct SmartAppraisalModalView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showCameraPicker) {
+                CameraPickerView(selectedImage: $scannedImage)
+                    .ignoresSafeArea()
+            }
+            .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPhotoItem, matching: .images)
+            .alert("Camera Unavailable", isPresented: $showCameraUnavailableAlert) {
+                Button("Choose from Library") {
+                    showPhotosPicker = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The camera is not available on this device or simulator. Would you like to select an image from your photo library instead?")
+            }
+            .alert("Camera Permission Required", isPresented: $showCameraPermissionAlert) {
+                Button("Open Settings") {
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsURL)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("XChange needs access to your camera to capture item photos for Google AI Appraise. Please enable Camera in iOS Settings.")
+            }
             .onAppear {
                 initializeAndScan()
             }
@@ -82,9 +121,16 @@ public struct SmartAppraisalModalView: View {
                     if let item = newItem,
                        let data = try? await item.loadTransferable(type: Data.self),
                        let img = UIImage(data: data) {
-                        self.scannedImage = img
-                        runAppraisal()
+                        await MainActor.run {
+                            self.scannedImage = img
+                            runAppraisal()
+                        }
                     }
+                }
+            }
+            .onChange(of: scannedImage) { _, newImg in
+                if newImg != nil {
+                    runAppraisal()
                 }
             }
         }
@@ -100,37 +146,60 @@ public struct SmartAppraisalModalView: View {
                 .frame(height: 230)
                 .overlay(
                     RoundedRectangle(cornerRadius: 22)
-                        .stroke(AppTheme.primary.opacity(0.3), lineWidth: 1.5)
+                        .stroke(effectiveImage != nil ? AppTheme.primary.opacity(0.3) : Color.yellow.opacity(0.3), lineWidth: 1.5)
                 )
             
-            // Item Image or Category Icon Display
-            if let imageToDisplay = scannedImage ?? initialImage {
+            // Item Image or No Image Prompt
+            if let imageToDisplay = effectiveImage {
                 Image(uiImage: imageToDisplay)
                     .resizable()
                     .scaledToFill()
                     .frame(height: 230)
                     .clipShape(RoundedRectangle(cornerRadius: 22))
                     .overlay(
-                        Color.black.opacity(0.2)
+                        Color.black.opacity(0.18)
                     )
+                
+                // Animated Scanning Laser Line
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.clear, AppTheme.brandGreen, Color.clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 3)
+                    .shadow(color: AppTheme.brandGreen, radius: 6)
+                    .offset(y: laserOffset)
+                    .onAppear {
+                        withAnimation(
+                            Animation.easeInOut(duration: 1.2)
+                                .repeatForever(autoreverses: true)
+                        ) {
+                            laserOffset = 100
+                        }
+                    }
             } else {
                 VStack(spacing: 12) {
-                    Image(systemName: selectedCategory.systemIcon)
-                        .font(.system(size: 64))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [AppTheme.primary, AppTheme.tradeAccent],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .shadow(color: AppTheme.primary.opacity(0.5), radius: 16)
+                    ZStack {
+                        Circle()
+                            .fill(Color.yellow.opacity(0.12))
+                            .frame(width: 70, height: 70)
+                        Image(systemName: "photo.badge.exclamationmark")
+                            .font(.system(size: 32))
+                            .foregroundColor(.yellow)
+                    }
                     
-                    Text(itemTitle.isEmpty ? "Inspecting \(selectedCategory.rawValue)" : itemTitle)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                    Text("No Picture Uploaded")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                        .lineLimit(1)
-                        .padding(.horizontal, 24)
+                    
+                    Text("Upload or take a photo below to appraise with Google Data")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.gray.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 30)
                 }
             }
             
@@ -139,52 +208,31 @@ public struct SmartAppraisalModalView: View {
                 HStack {
                     Image(systemName: "viewfinder")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundColor(AppTheme.tradeAccent)
+                        .foregroundColor(effectiveImage != nil ? AppTheme.tradeAccent : Color.yellow.opacity(0.7))
                     Spacer()
                     Image(systemName: "viewfinder")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundColor(AppTheme.tradeAccent)
+                        .foregroundColor(effectiveImage != nil ? AppTheme.tradeAccent : Color.yellow.opacity(0.7))
                 }
                 Spacer()
                 HStack {
                     Image(systemName: "viewfinder")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundColor(AppTheme.tradeAccent)
+                        .foregroundColor(effectiveImage != nil ? AppTheme.tradeAccent : Color.yellow.opacity(0.7))
                     Spacer()
                     Image(systemName: "viewfinder")
                         .font(.system(size: 24, weight: .light))
-                        .foregroundColor(AppTheme.tradeAccent)
+                        .foregroundColor(effectiveImage != nil ? AppTheme.tradeAccent : Color.yellow.opacity(0.7))
                 }
             }
             .padding(16)
             
-            // Animated Scanning Laser Line
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.clear, AppTheme.brandGreen, Color.clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 3)
-                .shadow(color: AppTheme.brandGreen, radius: 6)
-                .offset(y: laserOffset)
-                .onAppear {
-                    withAnimation(
-                        Animation.easeInOut(duration: 1.2)
-                            .repeatForever(autoreverses: true)
-                    ) {
-                        laserOffset = 100
-                    }
-                }
-            
             // Top Framework Badge & Photo Selector Button
             VStack {
                 HStack {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "sparkles")
-                        Text("Apple Vision & CoreML Engine")
+                        Text(effectiveImage != nil ? "Apple Vision & Google Search" : "Google AI Appraise")
                     }
                     .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
@@ -195,26 +243,98 @@ public struct SmartAppraisalModalView: View {
                     
                     Spacer()
                     
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "camera.fill")
-                            Text("Scan Photo")
+                    if effectiveImage != nil {
+                        Button {
+                            showPhotosPicker = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text("Change")
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
                         }
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        )
                     }
                 }
                 Spacer()
             }
             .padding(12)
         }
+    }
+    
+    // MARK: - No Image Uploaded Guidance Card
+    
+    private var noImageUploadedCard: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.yellow)
+                    .font(.system(size: 18))
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Picture Required for AI Appraise")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    Text("Upload an image to unlock Google Market pricing")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            
+            Text("Google AI Appraise needs a picture of your item to inspect logos, text, brand identifiers, and physical wear. It searches Google Data across Sri Lankan marketplaces to calculate the real average price.")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            HStack(spacing: 12) {
+                Button {
+                    AppTheme.triggerHaptic(style: .medium)
+                    checkAndOpenCamera()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "camera.fill")
+                        Text("Take Photo")
+                    }
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(AppTheme.primaryGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                Button {
+                    AppTheme.triggerHaptic(style: .medium)
+                    showPhotosPicker = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo.on.rectangle")
+                        Text("Choose from Library")
+                    }
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundColor(AppTheme.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(AppTheme.primary.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(AppTheme.primary.opacity(0.35), lineWidth: 1)
+                    )
+                }
+            }
+        }
+        .padding(16)
+        .modernCard()
     }
     
     private var categorySelectorSection: some View {
@@ -256,37 +376,110 @@ public struct SmartAppraisalModalView: View {
     
     private func appraisalResultsCard(_ result: AppraisalResult) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Header with Confidence Badge
-            HStack {
+            // Header: Google Average Price & Google Data Verified Pill
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Predicted Fair Barter Value")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 5) {
+                        Image(systemName: "globe.americas.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(red: 0.26, green: 0.52, blue: 0.96))
+                        Text("Average Price with Google Data")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
                     
-                    Text("LKR \(Int(result.estimatedFairValue))")
-                        .font(.system(size: 30, weight: .black, design: .rounded))
+                    Text(result.formattedGoogleAveragePrice)
+                        .font(.system(size: 32, weight: .black, design: .rounded))
                         .foregroundStyle(AppTheme.primaryGradient)
+                    
+                    Text("Market Range: \(result.formattedGoogleRange)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
                 
-                // Confidence Pill
-                VStack(alignment: .trailing, spacing: 2) {
+                // Google Verified Pill
+                VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.seal.fill")
-                            .foregroundColor(AppTheme.tradeAccent)
-                        Text(result.formattedConfidence)
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundColor(AppTheme.tradeAccent)
+                            .foregroundColor(.white)
+                        Text("Google Verified")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(AppTheme.tradeAccent.opacity(0.12))
+                    .background(Color(red: 0.26, green: 0.52, blue: 0.96))
                     .clipShape(Capsule())
                     
-                    Text("Range: \(result.formattedValueRange)")
+                    Text(result.formattedConfidence)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
+                }
+            }
+            
+            Divider()
+            
+            // Google Search Query Box
+            VStack(alignment: .leading, spacing: 6) {
+                Text("GOOGLE MARKET SEARCH QUERY")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(Color(red: 0.26, green: 0.52, blue: 0.96))
+                        .font(.system(size: 13, weight: .bold))
+                    
+                    Text(result.googleSearchQuery)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                }
+                .padding(10)
+                .background(Color.primary.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            
+            // Live Google Search Link
+            if let searchUrl = URL(string: result.googleSearchUrl) {
+                Link(destination: searchUrl) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.right.square.fill")
+                            .font(.system(size: 12))
+                        Text("View Live Listings on Google Search")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                    }
+                    .foregroundColor(Color(red: 0.26, green: 0.52, blue: 0.96))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(red: 0.26, green: 0.52, blue: 0.96).opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            
+            // Indexed Sources Chips
+            VStack(alignment: .leading, spacing: 6) {
+                Text("INDEXED MARKETPLACES")
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundColor(.secondary)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(result.googleIndexedSources, id: \.self) { source in
+                            Text(source)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.primary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.primary.opacity(0.06))
+                                .clipShape(Capsule())
+                        }
+                    }
                 }
             }
             
@@ -411,7 +604,7 @@ public struct SmartAppraisalModalView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text("Running Vision Neural Inference...")
+            Text("Searching Google Data & Calculating Market Average...")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.secondary)
         }
@@ -432,13 +625,15 @@ public struct SmartAppraisalModalView: View {
         }
         if let img = initialImage {
             scannedImage = img
+            runAppraisal()
         }
-        runAppraisal()
+        // Notice: If no image is provided, do NOT run appraisal automatically.
     }
     
     private func runAppraisal() {
+        guard let imageToAnalyze = effectiveImage else { return }
+        
         laserOffset = -100
-        let imageToAnalyze = scannedImage ?? initialImage
         let titleToAnalyze = itemTitle.isEmpty ? initialTitle : itemTitle
         let cat = selectedCategory
         let cond = selectedCondition
@@ -452,7 +647,37 @@ public struct SmartAppraisalModalView: View {
                 image: imageToAnalyze,
                 baseValue: baseVal
             )
-            self.currentResult = res
+            await MainActor.run {
+                self.currentResult = res
+            }
+        }
+    }
+    
+    private func checkAndOpenCamera() {
+        #if targetEnvironment(simulator)
+        if !UIImagePickerController.isSourceTypeAvailable(.camera) {
+            showCameraUnavailableAlert = true
+            return
+        }
+        #endif
+        
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            showCameraPicker = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self.showCameraPicker = true
+                    } else {
+                        self.showCameraPermissionAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showCameraPermissionAlert = true
+        @unknown default:
+            break
         }
     }
 }

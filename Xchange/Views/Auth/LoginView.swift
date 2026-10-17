@@ -403,6 +403,7 @@ public struct LoginView: View {
         
         if let location = testAccount?.location {
             userStore.currentUser.location = location
+            userStore.currentUser.district = SriLankaDistrict.detectDistrict(from: location) ?? "Colombo"
         }
         if let avatar = testAccount?.avatar {
             userStore.currentUser.avatar = avatar
@@ -416,32 +417,9 @@ public struct LoginView: View {
         
         userStore.saveCurrentUser()
         
-        // Sync any updated profile values directly from Firebase Realtime Database
-        let resolvedUid: String = authResponse?.localId ?? (
-            testAccount != nil 
-                ? (email.lowercased() == FirebaseAuthService.testUser1.email.lowercased() ? "7FHWqF6yFrYcaxhcbW7h0dNuwR32" : "wYuobctTnKPRIHv6ojg8gbjjzkX2")
-                : userStore.currentUser.id.uuidString
-        )
-        
+        // Sync any updated profile values and avatar directly from Firebase Realtime Database
         Task { @MainActor in
-            if let remoteProfile = await FirebaseDatabaseService.shared.fetchUserProfile(userId: resolvedUid) {
-                if let name = remoteProfile["displayName"] as? String, !name.isEmpty {
-                    self.userStore.currentUser.displayName = name
-                }
-                if let loc = remoteProfile["location"] as? String, !loc.isEmpty {
-                    self.userStore.currentUser.location = loc
-                }
-                if let bio = remoteProfile["bio"] as? String, !bio.isEmpty {
-                    self.userStore.currentUser.bio = bio
-                }
-                if let av = remoteProfile["avatar"] as? String, !av.isEmpty {
-                    self.userStore.currentUser.avatar = av
-                }
-                if let phone = remoteProfile["phoneNumber"] as? String, !phone.isEmpty {
-                    self.userStore.currentUser.phoneNumber = phone
-                }
-                self.userStore.saveCurrentUser()
-            }
+            await userStore.fetchRemoteProfile()
         }
         
         isSubmitting = false
@@ -466,27 +444,7 @@ public struct LoginView: View {
         let activeUser = userStore.currentUser
         Task { @MainActor in
             await FirebaseDatabaseService.shared.saveUserProfile(activeUser, authProvider: provider)
-            
-            // Check if there are remote profile properties already stored
-            let targetId = FirebaseDatabaseService.shared.resolveUserId(for: activeUser)
-            if let remote = await FirebaseDatabaseService.shared.fetchUserProfile(userId: targetId) {
-                if let loc = remote["location"] as? String, !loc.isEmpty {
-                    self.userStore.currentUser.location = loc
-                }
-                if let bio = remote["bio"] as? String, !bio.isEmpty {
-                    self.userStore.currentUser.bio = bio
-                }
-                if let rating = remote["rating"] as? Double {
-                    self.userStore.currentUser.rating = rating
-                }
-                if let trades = remote["tradesCompleted"] as? Int {
-                    self.userStore.currentUser.tradesCompleted = trades
-                }
-                if let phone = remote["phoneNumber"] as? String, !phone.isEmpty {
-                    self.userStore.currentUser.phoneNumber = phone
-                }
-                self.userStore.saveCurrentUser()
-            }
+            await userStore.fetchRemoteProfile()
         }
         
         AppTheme.triggerNotificationHaptic(type: .success)

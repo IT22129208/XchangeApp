@@ -63,6 +63,7 @@ public final class FirebaseDatabaseService: ObservableObject {
             "username": user.username,
             "email": user.email,
             "location": user.location,
+            "district": user.district,
             "bio": user.bio,
             "rating": user.rating,
             "tradesCompleted": user.tradesCompleted,
@@ -70,11 +71,18 @@ public final class FirebaseDatabaseService: ObservableObject {
             "isVerified": user.isVerified,
             "phoneNumber": user.phoneNumber,
             "avatar": user.avatar,
+            "wishlist": user.wishlist,
             "authProvider": provider,
             "updatedAt": ISO8601DateFormatter().string(from: Date())
         ]
         
-        if let image = avatarImage, let jpegData = image.jpegData(compressionQuality: 0.6) {
+        // Resolve avatar photo from explicit argument or local persistence cache
+        var resolvedImage = avatarImage
+        if resolvedImage == nil {
+            resolvedImage = PersistenceService.shared.resolveImage(nameOrPath: user.avatar)
+        }
+        
+        if let image = resolvedImage, let jpegData = image.jpegData(compressionQuality: 0.6) {
             payload["avatarBase64"] = jpegData.base64EncodedString()
         }
         
@@ -85,14 +93,64 @@ public final class FirebaseDatabaseService: ObservableObject {
         }
         
         do {
-            _ = try await performRequest(url: url, httpMethod: "PUT", payload: payload)
-            print("Successfully updated user profile in Firebase Realtime Database: \(user.displayName) (ID: \(targetId))")
+            _ = try await performRequest(url: url, httpMethod: "PATCH", payload: payload)
+            print("Successfully synchronized user profile & avatar to Firebase Realtime Database: \(user.displayName) (ID: \(targetId))")
+            
+            // Sync with Firebase Auth user profile if active token exists
+            if let token = FirebaseAuthService.shared.activeFirebaseUser?.idToken, !user.displayName.isEmpty {
+                try? await FirebaseAuthService.shared.updateDisplayName(token: token, displayName: user.displayName)
+            }
         } catch {
             print("Firebase Realtime Database user sync note: \(error.localizedDescription)")
             lastSyncError = error.localizedDescription
         }
         
         isSyncing = false
+    }
+    
+    /// Synchronizes remote profile values from Firebase into local user model (including decoding avatarBase64)
+    public func applyRemoteProfile(dict: [String: Any], to user: inout User) {
+        if let name = dict["displayName"] as? String, !name.isEmpty {
+            user.displayName = name
+        }
+        if let username = dict["username"] as? String, !username.isEmpty {
+            user.username = username
+        }
+        if let loc = dict["location"] as? String, !loc.isEmpty {
+            user.location = loc
+        }
+        if let dist = dict["district"] as? String, !dist.isEmpty {
+            user.district = dist
+        } else if let loc = dict["location"] as? String, !loc.isEmpty {
+            user.district = SriLankaDistrict.detectDistrict(from: loc) ?? "Colombo"
+        }
+        if let bio = dict["bio"] as? String, !bio.isEmpty {
+            user.bio = bio
+        }
+        if let phone = dict["phoneNumber"] as? String, !phone.isEmpty {
+            user.phoneNumber = phone
+        }
+        if let rating = dict["rating"] as? Double {
+            user.rating = rating
+        }
+        if let trades = dict["tradesCompleted"] as? Int {
+            user.tradesCompleted = trades
+        }
+        if let wishlist = dict["wishlist"] as? [String] {
+            user.wishlist = wishlist
+        }
+        
+        // Restore profile photo from avatarBase64 if present in remote database
+        if let base64 = dict["avatarBase64"] as? String,
+           let data = Data(base64Encoded: base64),
+           let uiImage = UIImage(data: data) {
+            let filename = "user_avatar_\(user.id.uuidString).jpg"
+            if PersistenceService.shared.saveImage(uiImage, filename: filename) {
+                user.avatar = filename
+            }
+        } else if let av = dict["avatar"] as? String, !av.isEmpty {
+            user.avatar = av
+        }
     }
     
     /// Fetches a user profile from Firebase Realtime Database (/users/{userId}.json)
@@ -137,6 +195,7 @@ public final class FirebaseDatabaseService: ObservableObject {
             "ownerAvatar": item.ownerAvatar,
             "ownerRating": item.ownerRating,
             "ownerLocation": item.ownerLocation,
+            "district": item.itemDistrict,
             "status": item.status.rawValue,
             "images": item.images,
             "tags": item.tags,
@@ -166,6 +225,25 @@ public final class FirebaseDatabaseService: ObservableObject {
             lastSyncError = error.localizedDescription
         }
         
+        isSyncing = false
+    }
+    
+    /// Deletes an item from Firebase Realtime Database
+    public func deleteItem(id: UUID) async {
+        isSyncing = true
+        let urlString = "\(Self.databaseBaseUrl)/items/\(id.uuidString).json"
+        guard let url = URL(string: urlString) else {
+            isSyncing = false
+            return
+        }
+        
+        do {
+            _ = try await performRequest(url: url, httpMethod: "DELETE", payload: nil)
+            print("Successfully deleted item from Firebase: \(id.uuidString)")
+        } catch {
+            print("Firebase Realtime Database item delete error: \(error.localizedDescription)")
+            lastSyncError = error.localizedDescription
+        }
         isSyncing = false
     }
     
@@ -236,20 +314,57 @@ public final class FirebaseDatabaseService: ObservableObject {
     }
     
     /// Updates the status of an existing proposal in Firebase Realtime Database
-    public func updateProposalStatus(id: UUID, status: TradeStatus) async {
+    public func updateProposalStatus(
+        id: UUID,
+        status: TradeStatus,
+        acceptedByUserId: UUID? = nil,
+        acceptedByName: String? = nil
+    ) async {
         let urlString = "\(Self.databaseBaseUrl)/proposals/\(id.uuidString).json"
         guard let url = URL(string: urlString) else { return }
         
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "status": status.rawValue,
             "updatedAt": ISO8601DateFormatter().string(from: Date())
         ]
+        if let acceptedByUserId = acceptedByUserId {
+            payload["acceptedByUserId"] = acceptedByUserId.uuidString
+        }
+        if let acceptedByName = acceptedByName {
+            payload["acceptedByName"] = acceptedByName
+            payload["acceptedAt"] = ISO8601DateFormatter().string(from: Date())
+        }
         
         do {
             _ = try await performRequest(url: url, httpMethod: "PATCH", payload: payload)
             print("Successfully updated proposal status in Firebase: \(id.uuidString) -> \(status.rawValue)")
         } catch {
             print("Firebase proposal status update error: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Synchronizes dual completion confirmation flags and trade status in Firebase Realtime Database
+    public func updateProposalCompletion(
+        id: UUID,
+        initiatorConfirmed: Bool,
+        receiverConfirmed: Bool,
+        status: TradeStatus
+    ) async {
+        let urlString = "\(Self.databaseBaseUrl)/proposals/\(id.uuidString).json"
+        guard let url = URL(string: urlString) else { return }
+        
+        let payload: [String: Any] = [
+            "initiatorConfirmedCompletion": initiatorConfirmed,
+            "receiverConfirmedCompletion": receiverConfirmed,
+            "status": status.rawValue,
+            "updatedAt": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        do {
+            _ = try await performRequest(url: url, httpMethod: "PATCH", payload: payload)
+            print("Successfully updated proposal completion in Firebase: \(id.uuidString) -> \(status.rawValue)")
+        } catch {
+            print("Firebase proposal completion update error: \(error.localizedDescription)")
         }
     }
     
@@ -355,6 +470,7 @@ public final class FirebaseDatabaseService: ObservableObject {
         let ownerAvatar = dict["ownerAvatar"] as? String ?? "person.crop.circle.fill"
         let ownerRating = dict["ownerRating"] as? Double ?? 4.9
         let ownerLocation = dict["ownerLocation"] as? String ?? "Colombo, Sri Lanka"
+        let district = dict["district"] as? String ?? SriLankaDistrict.detectDistrict(from: ownerLocation) ?? "Colombo"
         
         let statusRaw = dict["status"] as? String ?? ItemStatus.available.rawValue
         let status = ItemStatus(rawValue: statusRaw) ?? .available
@@ -400,6 +516,7 @@ public final class FirebaseDatabaseService: ObservableObject {
             ownerAvatar: ownerAvatar,
             ownerRating: ownerRating,
             ownerLocation: ownerLocation,
+            district: district,
             status: status,
             tags: tags,
             createdAt: createdAt
@@ -408,11 +525,14 @@ public final class FirebaseDatabaseService: ObservableObject {
     
     // MARK: - Network Request Helper
     
-    private func performRequest(url: URL, httpMethod: String, payload: [String: Any]) async throws -> [String: Any] {
+    private func performRequest(url: URL, httpMethod: String, payload: [String: Any]? = nil) async throws -> [String: Any] {
         var request = URLRequest(url: url)
         request.httpMethod = httpMethod
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+        
+        if let payload = payload {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+        }
         
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -424,7 +544,11 @@ public final class FirebaseDatabaseService: ObservableObject {
             throw NSError(domain: "FirebaseDatabaseError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorText])
         }
         
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        if data.isEmpty {
+            return [:]
+        }
+        
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         return json ?? [:]
     }
 }

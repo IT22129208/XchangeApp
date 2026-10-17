@@ -249,4 +249,120 @@ final class XchangeUnitTests: XCTestCase {
         PersistenceService.shared.delete(filename: testFilename)
         XCTAssertFalse(PersistenceService.shared.exists(filename: testFilename), "File should be deleted")
     }
+    
+    // MARK: - 7. Sri Lanka District & Location Filtering Tests
+    
+    func testSriLankaDistrictsCountAndProvinceMapping() {
+        // Must contain exactly 25 administrative districts in Sri Lanka
+        XCTAssertEqual(SriLankaDistrict.allDistricts.count, 25, "Sri Lanka must have exactly 25 official districts")
+        
+        // Verify key districts have correct province mappings
+        XCTAssertEqual(SriLankaDistrict.colombo.province, "Western Province")
+        XCTAssertEqual(SriLankaDistrict.kandy.province, "Central Province")
+        XCTAssertEqual(SriLankaDistrict.galle.province, "Southern Province")
+        XCTAssertEqual(SriLankaDistrict.jaffna.province, "Northern Province")
+        XCTAssertEqual(SriLankaDistrict.all.province, "Islandwide")
+    }
+    
+    func testDistrictDetectionFromLocationStrings() {
+        XCTAssertEqual(SriLankaDistrict.detectDistrict(from: "Malabe, Sri Lanka"), "Colombo")
+        XCTAssertEqual(SriLankaDistrict.detectDistrict(from: "Negombo, Sri Lanka"), "Gampaha")
+        XCTAssertEqual(SriLankaDistrict.detectDistrict(from: "Galle Fort, Sri Lanka"), "Galle")
+        XCTAssertEqual(SriLankaDistrict.detectDistrict(from: "Peradeniya, Kandy"), "Kandy")
+        XCTAssertEqual(SriLankaDistrict.detectDistrict(from: "Unknown Place, Kurunegala"), "Kurunegala")
+    }
+    
+    func testItemDistrictFilteringMatching() {
+        let colomboItem = Item(
+            title: "Colombo Item",
+            description: "Item in Malabe",
+            category: .electronics,
+            condition: .brandNew,
+            estimatedValue: 10000,
+            preferredTrades: "Cash",
+            images: [],
+            ownerId: UUID(),
+            ownerName: "Kasun",
+            ownerLocation: "Malabe, Colombo, Sri Lanka",
+            district: "Colombo"
+        )
+        
+        let kandyItem = Item(
+            title: "Kandy Item",
+            description: "Item in Kandy",
+            category: .collectibles,
+            condition: .likeNew,
+            estimatedValue: 20000,
+            preferredTrades: "Trade",
+            images: [],
+            ownerId: UUID(),
+            ownerName: "Dilini",
+            ownerLocation: "Kandy City, Sri Lanka",
+            district: "Kandy"
+        )
+        
+        // Entire Country should match all items
+        XCTAssertTrue(colomboItem.matchesDistrict(.all))
+        XCTAssertTrue(kandyItem.matchesDistrict(.all))
+        
+        // Specific district filters
+        XCTAssertTrue(colomboItem.matchesDistrict(.colombo))
+        XCTAssertFalse(colomboItem.matchesDistrict(.kandy))
+        
+        XCTAssertTrue(kandyItem.matchesDistrict(.kandy))
+        XCTAssertFalse(kandyItem.matchesDistrict(.colombo))
+    }
+    
+    func testAcceptedTradeExposesContactDetails() {
+        let current = userStore.currentUser
+        let alexId = UserStore.alexUserId
+        
+        let proposal = tradeStore.createProposal(
+            initiator: current,
+            receiverId: alexId,
+            receiverName: "Alex Rivera",
+            receiverAvatar: "camera.circle.fill",
+            receiverRating: 4.88,
+            receiverEmail: "alex@xchange.app",
+            receiverPhone: "+94 77 234 5678",
+            receiverDistrict: "Colombo",
+            receiverLocation: "Colombo 03, Sri Lanka",
+            offeredItems: [itemStore.items[0]],
+            requestedItems: [itemStore.items[1]],
+            note: "Trade proposal test"
+        )
+        
+        let alexUser = User(
+            id: alexId,
+            username: "alex_rivera",
+            displayName: "Alex Rivera",
+            email: "alex@xchange.app",
+            bio: "Photographer",
+            avatar: "camera.circle.fill",
+            location: "Colombo 03, Sri Lanka",
+            district: "Colombo",
+            phoneNumber: "+94 77 234 5678",
+            rating: 4.88
+        )
+        
+        tradeStore.acceptProposal(proposalId: proposal.id, acceptedBy: alexUser)
+        
+        let accepted = tradeStore.getProposal(byId: proposal.id)
+        XCTAssertNotNil(accepted)
+        XCTAssertEqual(accepted?.status, .accepted)
+        XCTAssertEqual(accepted?.acceptedByName, "Alex Rivera")
+        XCTAssertEqual(accepted?.acceptedByUserId, alexId)
+        
+        let acceptedTrader = accepted?.acceptedTrader(currentUser: current)
+        XCTAssertEqual(acceptedTrader?.name, "Alex Rivera")
+        XCTAssertEqual(acceptedTrader?.phone, "+94 77 234 5678")
+        XCTAssertEqual(acceptedTrader?.email, "alex@xchange.app")
+        XCTAssertEqual(acceptedTrader?.district, "Colombo")
+        XCTAssertFalse(acceptedTrader?.isCurrentUser ?? true)
+        
+        let partner = accepted?.partnerContact(currentUser: current)
+        XCTAssertEqual(partner?.name, "Alex Rivera")
+        XCTAssertEqual(partner?.phone, "+94 77 234 5678")
+        XCTAssertEqual(partner?.email, "alex@xchange.app")
+    }
 }

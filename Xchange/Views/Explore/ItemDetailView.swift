@@ -20,9 +20,20 @@ public struct ItemDetailView: View {
     @State private var showCreateProposalSheet = false
     @State private var showAppraisalModal = false
     @State private var showSafeZoneMap = false
+    @State private var showNoImageAlert = false
+    @State private var showEditItemSheet = false
+    
+    private var currentItem: Item {
+        itemStore.items.first(where: { $0.id == item.id }) ?? item
+    }
     
     private var isOwnItem: Bool {
-        item.isOwnedBy(user: userStore.currentUser)
+        currentItem.isOwnedBy(user: userStore.currentUser)
+    }
+    
+    private var resolvedItemImage: UIImage? {
+        guard let first = currentItem.images.first, !first.isEmpty else { return nil }
+        return PersistenceService.shared.resolveImage(nameOrPath: first)
     }
     
     public var body: some View {
@@ -87,30 +98,59 @@ public struct ItemDetailView: View {
                     }
                 }
                 
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        itemStore.toggleFavorite(for: item.id)
-                    } label: {
-                        Image(systemName: item.isFavorite ? "heart.fill" : "heart")
-                            .font(.system(size: 18))
-                            .foregroundColor(item.isFavorite ? .red : .primary)
+                if isOwnItem {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showEditItemSheet = true
+                            AppTheme.triggerHaptic(style: .medium)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "square.and.pencil")
+                                Text("Edit")
+                            }
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(AppTheme.primary)
+                        }
+                    }
+                } else {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            itemStore.toggleFavorite(for: currentItem.id)
+                        } label: {
+                            Image(systemName: currentItem.isFavorite ? "heart.fill" : "heart")
+                                .font(.system(size: 18))
+                                .foregroundColor(currentItem.isFavorite ? .red : .primary)
+                        }
                     }
                 }
             }
+            .sheet(isPresented: $showEditItemSheet) {
+                EditItemView(item: currentItem)
+            }
             .sheet(isPresented: $showCreateProposalSheet) {
-                CreateProposalView(targetItem: item)
+                CreateProposalView(targetItem: currentItem)
             }
             .sheet(isPresented: $showAppraisalModal) {
                 SmartAppraisalModalView(
-                    initialTitle: item.title,
-                    initialCategory: item.category,
-                    initialCondition: item.condition,
-                    initialImage: PersistenceService.shared.resolveImage(nameOrPath: item.images.first ?? ""),
-                    initialEstimatedValue: item.estimatedValue
+                    initialTitle: currentItem.title,
+                    initialCategory: currentItem.category,
+                    initialCondition: currentItem.condition,
+                    initialImage: resolvedItemImage,
+                    initialEstimatedValue: currentItem.estimatedValue
                 )
             }
             .sheet(isPresented: $showSafeZoneMap) {
                 SafeZoneMapView()
+            }
+            .alert("Picture Required for AI Appraise", isPresented: $showNoImageAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("This item does not have an uploaded picture. A photo is required to search Google Market Data for an accurate average price.")
+            }
+            .onChange(of: itemStore.items) { _, newItems in
+                if !newItems.contains(where: { $0.id == item.id }) {
+                    dismiss()
+                }
             }
         }
     }
@@ -119,7 +159,7 @@ public struct ItemDetailView: View {
     
     private var itemVisualHero: some View {
         ZStack(alignment: .bottomLeading) {
-            if let firstImage = item.images.first, !firstImage.isEmpty {
+            if let firstImage = currentItem.images.first, !firstImage.isEmpty {
                 if let customImg = PersistenceService.shared.resolveImage(nameOrPath: firstImage) {
                     Image(uiImage: customImg)
                         .resizable()
@@ -161,12 +201,12 @@ public struct ItemDetailView: View {
                 .frame(height: 280)
                 
                 VStack(spacing: 12) {
-                    Image(systemName: item.category.systemIcon)
+                    Image(systemName: currentItem.category.systemIcon)
                         .font(.system(size: 72, weight: .regular))
                         .foregroundColor(.white)
                         .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                     
-                    Text(item.category.rawValue)
+                    Text(currentItem.category.rawValue)
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundColor(.white.opacity(0.9))
                         .textCase(.uppercase)
@@ -187,9 +227,9 @@ public struct ItemDetailView: View {
             HStack(spacing: 8) {
                 // Condition Badge
                 HStack(spacing: 4) {
-                    Image(systemName: item.condition.iconName)
+                    Image(systemName: currentItem.condition.iconName)
                         .font(.system(size: 10, weight: .bold))
-                    Text(item.condition.rawValue)
+                    Text(currentItem.condition.rawValue)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                 }
                 .padding(.horizontal, 12)
@@ -201,9 +241,9 @@ public struct ItemDetailView: View {
                 // Status Badge
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(item.status.color)
+                        .fill(currentItem.status.color)
                         .frame(width: 8, height: 8)
-                    Text(item.status.rawValue)
+                    Text(currentItem.status.rawValue)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                 }
                 .padding(.horizontal, 10)
@@ -230,7 +270,7 @@ public struct ItemDetailView: View {
     private var titleAndValueSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
-                Text(item.title)
+                Text(currentItem.title)
                     .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundColor(.primary)
                 
@@ -243,7 +283,7 @@ public struct ItemDetailView: View {
                         .font(.system(size: 9, weight: .heavy, design: .rounded))
                         .foregroundColor(.secondary)
                     
-                    Text(item.formattedValue)
+                    Text(currentItem.formattedValue)
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundColor(AppTheme.primary)
                 }
@@ -261,7 +301,7 @@ public struct ItemDetailView: View {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.system(size: 12))
                             .foregroundColor(AppTheme.tradeAccent)
-                        Text(item.ownerLocation)
+                        Text(currentItem.ownerLocation)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.primary)
                     }
@@ -276,14 +316,33 @@ public struct ItemDetailView: View {
     
     private var emergingTechActionRow: some View {
         Button {
-            showAppraisalModal = true
-            AppTheme.triggerHaptic(style: .medium)
+            if resolvedItemImage == nil {
+                AppTheme.triggerNotificationHaptic(type: .warning)
+                showNoImageAlert = true
+            } else {
+                AppTheme.triggerHaptic(style: .medium)
+                showAppraisalModal = true
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 14, weight: .bold))
-                Text("AI Smart Valuation Breakdown")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("AI Smart Valuation Breakdown")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                        Text("GOOGLE DATA")
+                            .font(.system(size: 8, weight: .heavy))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(AppTheme.tradeAccent)
+                            .clipShape(Capsule())
+                    }
+                    Text("Live Google market price analysis & average benchmark")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
@@ -313,7 +372,7 @@ public struct ItemDetailView: View {
                     .font(.system(size: 14, weight: .bold, design: .rounded))
             }
             
-            Text(item.preferredTrades)
+            Text(currentItem.preferredTrades)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.primary)
                 .padding(14)
@@ -332,7 +391,7 @@ public struct ItemDetailView: View {
             Text("Description")
                 .font(.system(size: 15, weight: .bold, design: .rounded))
             
-            Text(item.description)
+            Text(currentItem.description)
                 .font(.system(size: 14, weight: .regular))
                 .foregroundColor(.secondary)
                 .lineSpacing(4)
@@ -346,7 +405,7 @@ public struct ItemDetailView: View {
                 .foregroundColor(.secondary)
             
             FlowLayout(spacing: 8) {
-                ForEach(item.tags, id: \.self) { tag in
+                ForEach(currentItem.tags, id: \.self) { tag in
                     Text("#\(tag)")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(AppTheme.primary)
@@ -378,19 +437,19 @@ public struct ItemDetailView: View {
     }
     
     private var displayOwnerPhone: String {
-        if !item.ownerPhone.isEmpty {
-            return item.ownerPhone
+        if !currentItem.ownerPhone.isEmpty {
+            return currentItem.ownerPhone
         }
-        if item.isOwnedBy(user: userStore.currentUser) && !userStore.currentUser.phoneNumber.isEmpty {
+        if currentItem.isOwnedBy(user: userStore.currentUser) && !userStore.currentUser.phoneNumber.isEmpty {
             return userStore.currentUser.phoneNumber
         }
-        if item.ownerEmail.lowercased() == "testuser1@xchange.lk" || item.ownerName.lowercased().contains("kasun") {
+        if currentItem.ownerEmail.lowercased() == "testuser1@xchange.lk" || currentItem.ownerName.lowercased().contains("kasun") {
             return "+94 77 123 4567"
         }
-        if item.ownerEmail.lowercased() == "testuser2@xchange.lk" || item.ownerName.lowercased().contains("dilini") {
+        if currentItem.ownerEmail.lowercased() == "testuser2@xchange.lk" || currentItem.ownerName.lowercased().contains("dilini") {
             return "+94 71 987 6543"
         }
-        if item.ownerName.lowercased().contains("sashik") {
+        if currentItem.ownerName.lowercased().contains("sashik") {
             return "+94 76 555 1234"
         }
         return "+94 77 123 4567"
@@ -403,16 +462,11 @@ public struct ItemDetailView: View {
             
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    Image(systemName: item.ownerAvatar)
-                        .font(.system(size: 32))
-                        .foregroundColor(AppTheme.primary)
-                        .frame(width: 50, height: 50)
-                        .background(AppTheme.primary.opacity(0.1))
-                        .clipShape(Circle())
+                    UserAvatarView(avatar: currentItem.ownerAvatar, size: 50)
                     
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Text(item.ownerName)
+                            Text(currentItem.ownerName)
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                             
                             Image(systemName: "checkmark.seal.fill")
@@ -425,7 +479,7 @@ public struct ItemDetailView: View {
                                 Image(systemName: "star.fill")
                                     .font(.system(size: 11))
                                     .foregroundColor(.yellow)
-                                Text(String(format: "%.2f Rating", item.ownerRating))
+                                Text(String(format: "%.2f Rating", currentItem.ownerRating))
                                     .font(.system(size: 12, weight: .semibold))
                             }
                             
@@ -527,22 +581,23 @@ public struct ItemDetailView: View {
             
             HStack(spacing: 12) {
                 if isOwnItem {
-                    HStack(spacing: 8) {
-                        Image(systemName: "person.crop.circle.badge.checkmark")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.primary)
-                        Text("This is your listed item")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
+                    Button {
+                        showEditItemSheet = true
+                        AppTheme.triggerHaptic(style: .medium)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.pencil")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("Edit Listing Details")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppTheme.primaryGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .shadow(color: AppTheme.primary.opacity(0.35), radius: 10, x: 0, y: 4)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(AppTheme.primary.opacity(0.3), lineWidth: 1)
-                    )
                 } else {
                     Button {
                         showCreateProposalSheet = true

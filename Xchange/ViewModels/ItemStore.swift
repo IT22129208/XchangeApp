@@ -18,6 +18,7 @@ public class ItemStore: ObservableObject {
     @Published public var selectedConditionFilter: ItemCondition? = nil
     @Published public var maxPriceFilter: Double = 500000
     @Published public var sortBy: ItemSortOption = .newest
+    @Published public var selectedDistrictFilter: SriLankaDistrict = .all
     
     private let persistence = PersistenceService.shared
     private var cancellables = Set<AnyCancellable>()
@@ -63,6 +64,10 @@ public class ItemStore: ObservableObject {
            stored.contains(where: { $0.ownerLocation.contains("Sri Lanka") && $0.estimatedValue >= 1000 }) {
             var updated = false
             for i in 0..<stored.count {
+                if stored[i].district == nil || stored[i].district?.isEmpty == true {
+                    stored[i].district = SriLankaDistrict.detectDistrict(from: stored[i].ownerLocation) ?? "Colombo"
+                    updated = true
+                }
                 if stored[i].ownerName.lowercased().contains("kasun") {
                     if stored[i].ownerId != UserStore.testUser1Id || stored[i].ownerEmail.isEmpty {
                         stored[i].ownerId = UserStore.testUser1Id
@@ -115,10 +120,13 @@ public class ItemStore: ObservableObject {
             // Filter by Max Value
             let matchesValue = item.estimatedValue <= maxPriceFilter
             
+            // Filter by District
+            let matchesDistrict = (selectedDistrictFilter == .all || item.matchesDistrict(selectedDistrictFilter))
+            
             // Only available or in negotiation
             let matchesStatus = item.status != .traded
             
-            return matchesCategory && matchesSearch && matchesCondition && matchesValue && matchesStatus
+            return matchesCategory && matchesSearch && matchesCondition && matchesValue && matchesStatus && matchesDistrict
         }.sorted { a, b in
             switch sortBy {
             case .newest:
@@ -163,9 +171,35 @@ public class ItemStore: ObservableObject {
         AppTheme.triggerNotificationHaptic(type: .success)
     }
     
-    public func updateItem(_ item: Item) {
+    public func updateItem(_ item: Item, image: UIImage? = nil) {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index] = item
+            saveItems()
+            Task {
+                await FirebaseDatabaseService.shared.publishItem(item, image: image)
+            }
+        }
+    }
+    
+    /// Updates owner details (name, avatar, phone, location, district) across all items owned by the user and syncs with Firebase
+    public func updateOwnerProfileForItems(user: User) {
+        var didUpdate = false
+        for i in 0..<items.count {
+            if items[i].isOwnedBy(user: user) || items[i].ownerId == user.id {
+                items[i].ownerName = user.displayName
+                items[i].ownerAvatar = user.avatar
+                items[i].ownerPhone = user.phoneNumber
+                items[i].district = user.district
+                items[i].ownerLocation = user.location
+                didUpdate = true
+                
+                let updatedItem = items[i]
+                Task {
+                    await FirebaseDatabaseService.shared.publishItem(updatedItem)
+                }
+            }
+        }
+        if didUpdate {
             saveItems()
         }
     }
@@ -173,6 +207,9 @@ public class ItemStore: ObservableObject {
     public func deleteItem(byId id: UUID) {
         items.removeAll { $0.id == id }
         saveItems()
+        Task {
+            await FirebaseDatabaseService.shared.deleteItem(id: id)
+        }
     }
     
     public func setItemStatus(id: UUID, status: ItemStatus) {

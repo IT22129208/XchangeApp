@@ -121,6 +121,7 @@ public struct Item: Identifiable, Codable, Hashable {
     public var ownerAvatar: String
     public var ownerRating: Double
     public var ownerLocation: String
+    public var district: String?
     public var status: ItemStatus
     public var tags: [String]
     public var createdAt: Date
@@ -142,6 +143,7 @@ public struct Item: Identifiable, Codable, Hashable {
         ownerAvatar: String = "person.crop.circle.fill",
         ownerRating: Double = 5.0,
         ownerLocation: String = "Colombo, Sri Lanka",
+        district: String? = nil,
         status: ItemStatus = .available,
         tags: [String] = [],
         createdAt: Date = Date(),
@@ -162,6 +164,7 @@ public struct Item: Identifiable, Codable, Hashable {
         self.ownerAvatar = ownerAvatar
         self.ownerRating = ownerRating
         self.ownerLocation = ownerLocation
+        self.district = district ?? SriLankaDistrict.detectDistrict(from: ownerLocation) ?? "Colombo"
         self.status = status
         self.tags = tags
         self.createdAt = createdAt
@@ -170,7 +173,7 @@ public struct Item: Identifiable, Codable, Hashable {
     
     enum CodingKeys: String, CodingKey {
         case id, title, description, category, condition, estimatedValue, preferredTrades
-        case images, ownerId, ownerName, ownerEmail, ownerPhone, ownerAvatar, ownerRating, ownerLocation
+        case images, ownerId, ownerName, ownerEmail, ownerPhone, ownerAvatar, ownerRating, ownerLocation, district
         case status, tags, createdAt, isFavorite
     }
     
@@ -190,11 +193,40 @@ public struct Item: Identifiable, Codable, Hashable {
         ownerPhone = try container.decodeIfPresent(String.self, forKey: .ownerPhone) ?? ""
         ownerAvatar = try container.decodeIfPresent(String.self, forKey: .ownerAvatar) ?? "person.crop.circle.fill"
         ownerRating = try container.decodeIfPresent(Double.self, forKey: .ownerRating) ?? 5.0
-        ownerLocation = try container.decodeIfPresent(String.self, forKey: .ownerLocation) ?? "Colombo, Sri Lanka"
+        let loc = try container.decodeIfPresent(String.self, forKey: .ownerLocation) ?? "Colombo, Sri Lanka"
+        ownerLocation = loc
+        district = try container.decodeIfPresent(String.self, forKey: .district) ?? SriLankaDistrict.detectDistrict(from: loc) ?? "Colombo"
         status = try container.decodeIfPresent(ItemStatus.self, forKey: .status) ?? .available
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+    }
+    
+    /// Returns the resolved Sri Lankan district for this ad
+    public var itemDistrict: String {
+        if let d = district, !d.isEmpty {
+            return d
+        }
+        return SriLankaDistrict.detectDistrict(from: ownerLocation) ?? "Colombo"
+    }
+    
+    /// Evaluates if this listing belongs to the selected district filter
+    public func matchesDistrict(_ selectedDistrict: SriLankaDistrict) -> Bool {
+        if selectedDistrict == .all {
+            return true
+        }
+        let target = selectedDistrict.rawValue.lowercased()
+        if itemDistrict.lowercased() == target {
+            return true
+        }
+        if ownerLocation.lowercased().contains(target) {
+            return true
+        }
+        if let detected = SriLankaDistrict.detectDistrict(from: ownerLocation),
+           detected.lowercased() == target {
+            return true
+        }
+        return false
     }
     
     /// Checks if this item belongs to the specified user
